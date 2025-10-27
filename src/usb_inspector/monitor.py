@@ -31,10 +31,12 @@ class USBDeviceMonitor:
 
     def get_device_info(self, device) -> dict[str, any]:
         """Extract detailed information from a USB device"""
-        # print(type(device))
+        print(dir(device))
+        #  'get_active_configuration', 'iManufacturer', 'iProduct', 'iSerialNumber', 'idProduct', 'idVendor', 'is_kernel_driver_active', 'langids', 'manufacturer', 'parent', 'port_number', 'port_numbers', 'product', 'read', 'reset', 'serial_number', 'set_configuration', 'set_interface_altsetting', 'speed', 'write
         info = {
-            "vendor_id": f"{device.idVendor:04x}",
             "product_id": f"{device.idProduct:04x}",
+            "vendor_id": f"{device.idVendor:04x}",
+            # "version": device.bcdDevice,
             "bus": device.bus,
             "address": device.address,
             "device_id": self.get_device_id(device),

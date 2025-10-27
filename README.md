@@ -1,6 +1,6 @@
-# Host Info
+# USB Inspector
 
-![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-0%25-brightgreen)
 
 ## Overview
 

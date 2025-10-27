@@ -188,9 +188,9 @@ dependency_urls: requirements_dependency pyproject_dependency ## Generate depend
 # host=raspberrypi.local
 # remote_dir=/home/pi/Sandbox/Python/my-pypi-packages/usb-inspector
 
-user=xstudios
-host=art-station-table1.local
-remote_dir=/home/xstudios/usb-inspector
+user=pi
+host=raspi3b-2.local
+remote_dir=/home/pi/Projects/my-pypi-packages/usb-inspector
 
 rsync_to_pi:	## Sync files to Raspberry Pi
 	rsync -avz . ${user}@${host}:${remote_dir} --delete \
