@@ -18,7 +18,11 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
+    "chardet>=5.2.0",
+    "click>=8.3.0",
+    "pandas>=2.3.3",
     "pyusb>=1.3.1",
+    "tabulate>=0.9.0",
 ]
 
 dynamic = ["version", "readme"]
@@ -54,6 +58,9 @@ Changelog = "https://bitbucket.org/tsantor/usb-inspector/blob/master/HISTORY.md"
 [tool.setuptools.packages.find]
 # https://setuptools.pypa.io/en/latest/userguide/datafiles.html
 where = ["src"]
+
+[project.scripts]
+usb-inspector = "usb_inspector.cli:cli"
 
 [tool.setuptools.dynamic]
 version = { attr = "usb_inspector.__version__" }

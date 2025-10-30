@@ -4,11 +4,10 @@
 
 ## Overview
 
-A simple python package to gather host information from Windows, Mac and Linux. Returns host data as dicts to be used internally or sent to front-end dashboard applications as JSON.
+A simple package that allows you to lookup USB vendor and device IDs and get back a human readable vendor and device name.
+It includes ability to manually update the USB DB without installing a new version of `usb-inspector`.
 
 ## Installation
-
-Install Host Info:
 
 ```bash
 python3 -m pip install usb-inspector
@@ -37,36 +36,11 @@ If you experience any issues, please create an [issue](https://github.com/tsanto
 
 ## Example Usage
 
-```python
-from usb_inspector import get_device_info
-from usb_inspector import get_health_info
+Command Line:
+```bash
+usb-inspector lookup --vendor-id 1A40
+usb-inspector lookup --vendor-id 1A40 --device-id 0801
 
-print(get_device_info())
-print(get_health_info())
-
-# You can also call individual methods:
-from usb_inspector import get_cpu_info
-from usb_inspector import get_datetime_info
-from usb_inspector import get_disk_info
-from usb_inspector import get_gpu_info
-from usb_inspector import get_mem_info
-from usb_inspector import get_network_info
-from usb_inspector import get_os_info
-from usb_inspector import get_platform_info
-from usb_inspector import get_uptime_info
+usb-inspector update-db
+usb-inspector delete-db
 ```
-
-## Use with Caution!
-
-To control system services we need to allow passwordless use of specific executables. You should know the security implications of doing this so **use at your own risk**.
-
-### Linux (Ubuntu)
-
-Use `sudo visudo` to add the following lines:
-
-```ini
-%sudo ALL=(ALL) NOPASSWD: /usr/sbin/ufw
-%sudo ALL=(ALL) NOPASSWD: /usr/sbin/dmidecode
-```
-
-Save and exit the file (`:wq!`). Then do:
