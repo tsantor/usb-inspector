@@ -70,17 +70,18 @@ class USBDeviceMonitor:
         # Lookup additional details from the USB database
         details = lookup_usb_details(info["vendor_id"], info["device_id"])
         if details:
-            info["vendor_name"] = details["vendor_name"]
+            info["vendor_name"] = details.get("vendor_name", "Unknown")
             if info["device_name"] is None:
                 logger.debug(
                     "Found device name for %s:%s: %s",
                     info["vendor_id"],
                     info["device_id"],
-                    details["device_name"],
+                    details.get("device_name", "Unknown"),
                 )
-                info["device_name"] = details["device_name"]
-            # info.update(details)
-        info["vendor_name"] = f"{details['vendor_name']}"
+                info["device_name"] = details.get("device_name", "Unknown")
+        else:
+            info["vendor_name"] = "Unknown"
+
         if info["vendor_name_short"]:
             info["vendor_name"] += f" ({info['vendor_name_short']})"
 
