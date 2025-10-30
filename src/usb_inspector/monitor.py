@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class UsbData:
-    product_id: str
     vendor_id: str
     bus: int
     address: int
@@ -37,42 +36,42 @@ class USBDeviceMonitor:
         self.current_devices_list = []
         self._monitoring = False
 
-    def get_device_id(self, device) -> str:
+    def get_device_uid(self, device) -> str:
         """Generate unique identifier for a USB device"""
         return f"{device.idVendor:04x}:{device.idProduct:04x}:{device.bus}:{device.address}"
 
     def get_device_info(self, device) -> dict[str, any]:
         """Extract detailed information from a USB device"""
         info = {
-            "product_id": f"{device.idProduct:04x}",
+            "device_id": f"{device.idProduct:04x}",
             "vendor_id": f"{device.idVendor:04x}",
             "version": device.bcdDevice,
             "bus": device.bus,
             "address": device.address,
-            "device_id": self.get_device_id(device),
+            "uid": self.get_device_uid(device),
         }
 
         # Try to get manufacturer and product strings (may fail without permissions)
         try:
             if device.manufacturer:
-                info["manufacturer"] = device.manufacturer
-        except (ValueError, usb.core.USBError):
-            info["manufacturer"] = "Unknown"
+                info["vendor_name_short"] = device.manufacturer
+        except (ValueError, usb.core.USBError, NotImplementedError):
+            info["vendor_name_short"] = None
 
         try:
             if device.product:
                 info["product"] = device.product
-        except (ValueError, usb.core.USBError):
-            info["product"] = "Unknown"
+        except (ValueError, usb.core.USBError, NotImplementedError):
+            info["product"] = None
 
         try:
             if device.serial_number:
                 info["serial"] = device.serial_number
-        except (ValueError, usb.core.USBError):
-            info["serial"] = "Unknown"
+        except (ValueError, usb.core.USBError, NotImplementedError):
+            info["serial"] = None
 
         # Lookup additional details from the USB database
-        details = lookup_usb_details(info["vendor_id"], info["product_id"])
+        details = lookup_usb_details(info["vendor_id"], info["device_id"])
         if details:
             info.update(details)
 
@@ -110,8 +109,8 @@ class USBDeviceMonitor:
 
         logger.info("Currently connected devices: %d", len(current_devices_list))
         for dev in current_devices_list:
-            manufacturer = dev.get("manufacturer", "Unknown")
-            product = dev.get("product", "Unknown")
+            manufacturer = dev.get("manufacturer", None)
+            product = dev.get("product", None)
             logger.info(
                 "  - %s %s (%s:%s)",
                 manufacturer,
@@ -135,8 +134,8 @@ class USBDeviceMonitor:
                 if new_devices:
                     for dev in self.current_devices_list:
                         if dev["device_id"] in new_devices:
-                            manufacturer = dev.get("manufacturer", "Unknown")
-                            product = dev.get("product", "Unknown")
+                            manufacturer = dev.get("manufacturer", None)
+                            product = dev.get("product", None)
                             logger.info(
                                 "[CONNECTED] - %s %s (%s:%s)",
                                 manufacturer,

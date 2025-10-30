@@ -1,6 +1,8 @@
 import asyncio
+import json
 
 import pytest
+from rich import print
 
 from usb_inspector.monitor import USBDeviceMonitor
 
@@ -20,7 +22,7 @@ async def test_get_current_devices_real():
 
     # Log the devices for debugging
     for device in current_devices:
-        print(device)
+        print(json.dumps(device, indent=2))
 
     # Ensure each device in the list is a dictionary
     for device in current_devices:

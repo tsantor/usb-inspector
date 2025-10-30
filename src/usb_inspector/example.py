@@ -16,7 +16,7 @@ logger.setLevel(logging.INFO)
 async def custom_callback(event_type: str, device_info: dict):
     """Example custom async callback function"""
     if event_type == "connected":
-        product = device_info.get("product", "Unknown")
+        product = device_info.get("product", None)
         logger.info("Custom handler: New device detected - %s", product)
         # Can do async operations here
         await asyncio.sleep(0.1)  # Simulating async work
