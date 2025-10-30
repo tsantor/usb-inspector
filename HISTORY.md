@@ -9,3 +9,7 @@ All notable changes to this project will be documented in this file. This projec
 ## 0.1.1 (2025-10-30)
 
 - Added `start` as an alias for `monitor`.
+
+## 0.1.2 (2025-10-30)
+
+- Fix lookup error

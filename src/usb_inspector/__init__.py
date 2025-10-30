@@ -5,7 +5,7 @@ from importlib import resources
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 data_file = resources.files("usb_inspector.data") / "usb.ids"
 usb_db = resources.files("usb_inspector.data") / "usb_data.db"
