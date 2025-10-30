@@ -53,27 +53,36 @@ class USBDeviceMonitor:
 
         # Try to get manufacturer and product strings (may fail without permissions)
         try:
-            if device.manufacturer:
-                info["vendor_name_short"] = device.manufacturer
+            info["vendor_name_short"] = device.manufacturer
         except (ValueError, usb.core.USBError, NotImplementedError):
             info["vendor_name_short"] = None
 
         try:
-            if device.product:
-                info["product"] = device.product
+            info["device_name"] = device.product
         except (ValueError, usb.core.USBError, NotImplementedError):
-            info["product"] = None
+            info["device_name"] = None
 
         try:
-            if device.serial_number:
-                info["serial"] = device.serial_number
+            info["serial"] = device.serial_number
         except (ValueError, usb.core.USBError, NotImplementedError):
             info["serial"] = None
 
         # Lookup additional details from the USB database
         details = lookup_usb_details(info["vendor_id"], info["device_id"])
         if details:
-            info.update(details)
+            info["vendor_name"] = details["vendor_name"]
+            if info["device_name"] is None:
+                logger.debug(
+                    "Found device name for %s:%s: %s",
+                    info["vendor_id"],
+                    info["device_id"],
+                    details["device_name"],
+                )
+                info["device_name"] = details["device_name"]
+            # info.update(details)
+        info["vendor_name"] = f"{details['vendor_name']}"
+        if info["vendor_name_short"]:
+            info["vendor_name"] += f" ({info['vendor_name_short']})"
 
         # Sort the dictionary by keys
         return dict(sorted(info.items()))
@@ -109,14 +118,14 @@ class USBDeviceMonitor:
 
         logger.info("Currently connected devices: %d", len(current_devices_list))
         for dev in current_devices_list:
-            manufacturer = dev.get("manufacturer", None)
-            product = dev.get("product", None)
+            manufacturer = dev.get("vendor_name", None)
+            product = dev.get("device_name", None)
             logger.info(
                 "  - %s %s (%s:%s)",
                 manufacturer,
                 product,
                 dev.get("vendor_id"),
-                dev.get("product_id"),
+                dev.get("device_id"),
             )
 
         try:
@@ -134,14 +143,14 @@ class USBDeviceMonitor:
                 if new_devices:
                     for dev in self.current_devices_list:
                         if dev["device_id"] in new_devices:
-                            manufacturer = dev.get("manufacturer", None)
-                            product = dev.get("product", None)
+                            manufacturer = dev.get("vendor_name", None)
+                            product = dev.get("device_name", None)
                             logger.info(
                                 "[CONNECTED] - %s %s (%s:%s)",
                                 manufacturer,
                                 product,
                                 dev.get("vendor_id"),
-                                dev.get("product_id"),
+                                dev.get("device_id"),
                             )
                             if callback:
                                 await callback("connected", dev)
