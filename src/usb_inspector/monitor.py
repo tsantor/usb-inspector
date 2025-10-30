@@ -177,6 +177,12 @@ class USBDeviceMonitor:
         except KeyboardInterrupt:
             logger.info("Monitoring stopped")
 
+    async def start(
+        self, callback: Callable[[str, dict], Awaitable[None]] | None = None
+    ):
+        """Alias for monitor() to start monitoring"""
+        await self.monitor(callback)
+
     def stop(self):
         """Stop monitoring"""
         self._monitoring = False

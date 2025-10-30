@@ -24,6 +24,16 @@ usb-inspector update-db
 usb-inspector delete-db
 ```
 
+```python
+from usb_inspector.monitor import USBDeviceMonitor
+
+usb_monitor = USBDeviceMonitor(poll_interval=1.0)
+usb_monitor.monitor()
+# Do stuff
+...
+usb_monitor.stop()
+```
+
 ## Issues
 
 If you experience any issues, please create an [issue](https://bitbucket.org/xstudios/usb-inspector/issues) on Bitbucket.
