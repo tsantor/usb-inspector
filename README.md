@@ -13,6 +13,22 @@ It includes ability to manually update the USB DB without installing a new versi
 python3 -m pip install usb-inspector
 ```
 
+## Example Usage
+
+Command Line:
+```bash
+usb-inspector lookup --vendor-id 1A40
+usb-inspector lookup --vendor-id 1A40 --device-id 0801
+
+usb-inspector update-db
+usb-inspector delete-db
+```
+
+## Issues
+
+If you experience any issues, please create an [issue](https://bitbucket.org/xstudios/usb-inspector/issues) on Bitbucket.
+
+
 ## Development
 
 To get a list of all commands with descriptions simply run `make`.
@@ -28,19 +44,4 @@ make pip_install_editable
 make pytest
 make coverage
 make open_coverage
-```
-
-## Issues
-
-If you experience any issues, please create an [issue](https://github.com/tsantor/usb-inspector/issues) on Github.
-
-## Example Usage
-
-Command Line:
-```bash
-usb-inspector lookup --vendor-id 1A40
-usb-inspector lookup --vendor-id 1A40 --device-id 0801
-
-usb-inspector update-db
-usb-inspector delete-db
 ```

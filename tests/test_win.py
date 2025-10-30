@@ -12,6 +12,5 @@ def test_win():
     else:
         print("Connected USB Devices (Vendor ID: Product ID):")  # noqa: T201
         for dev in devices:
-            print(dir(dev))
             # Print Vendor ID and Product ID in hexadecimal format
             print(f"- 0x{dev.idVendor:04x}:0x{dev.idProduct:04x}")  # noqa: T201

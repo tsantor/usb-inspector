@@ -4,10 +4,22 @@ import logging
 # import time
 from collections.abc import Awaitable
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import usb.core
 
+from usb_inspector.db import lookup_usb_details
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class UsbData:
+    product_id: str
+    vendor_id: str
+    bus: int
+    address: int
+    device_id: str
 
 
 class USBDeviceMonitor:
@@ -31,12 +43,10 @@ class USBDeviceMonitor:
 
     def get_device_info(self, device) -> dict[str, any]:
         """Extract detailed information from a USB device"""
-        # print(dir(device))
-        #  'get_active_configuration', 'iManufacturer', 'iProduct', 'iSerialNumber', 'idProduct', 'idVendor', 'is_kernel_driver_active', 'langids', 'manufacturer', 'parent', 'port_number', 'port_numbers', 'product', 'read', 'reset', 'serial_number', 'set_configuration', 'set_interface_altsetting', 'speed', 'write
         info = {
             "product_id": f"{device.idProduct:04x}",
             "vendor_id": f"{device.idVendor:04x}",
-            # "version": device.bcdDevice,
+            "version": device.bcdDevice,
             "bus": device.bus,
             "address": device.address,
             "device_id": self.get_device_id(device),
@@ -61,7 +71,13 @@ class USBDeviceMonitor:
         except (ValueError, usb.core.USBError):
             info["serial"] = "Unknown"
 
-        return info
+        # Lookup additional details from the USB database
+        details = lookup_usb_details(info["vendor_id"], info["product_id"])
+        if details:
+            info.update(details)
+
+        # Sort the dictionary by keys
+        return dict(sorted(info.items()))
 
     async def get_current_devices(self) -> list[dict[str, any]]:
         """Get list of all currently connected USB devices (async)"""
