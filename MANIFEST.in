@@ -4,3 +4,4 @@ include LICENSE
 include README.md
 
 recursive-include src/usb_inspector/data/ *.db
+recursive-include src/usb_inspector/data/ *.dll

@@ -1,11 +1,27 @@
 import logging
 from importlib import resources
+from pathlib import Path
+
+import click
+import platformdirs
 
 # Basic logger setup; users of this package can configure logging as needed
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-__version__ = "0.1.2"
 
 data_file = resources.files("usb_inspector.data") / "usb.ids"
-usb_db = resources.files("usb_inspector.data") / "usb_data.db"
+# usb_db = resources.files("usb_inspector.data") / "usb_data.db"
+
+data_dir = Path(
+    platformdirs.user_data_dir(
+        appname="usb-inspector",
+        appauthor="xstudios",
+        ensure_exists=True,
+    )
+)
+usb_db = data_dir / "usb_data.db"
+click.echo(f"Using USB database at: {usb_db}")
+
+
+__version__ = "0.1.2"

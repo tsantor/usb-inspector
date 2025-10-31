@@ -1,10 +1,10 @@
 # USB Inspector
 
-![Coverage](https://img.shields.io/badge/coverage-0%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-57%25-brightgreen)
 
 ## Overview
 
-A simple package that allows you to lookup USB vendor and device IDs and get back a human readable vendor and device name.
+A simple package that leverages `pyusb` and allows you to lookup USB vendor and device IDs and get back a human readable vendor and device name.
 It includes ability to manually update the USB DB without installing a new version of `usb-inspector`.
 
 ## Installation
@@ -12,6 +12,8 @@ It includes ability to manually update the USB DB without installing a new versi
 ```bash
 python3 -m pip install usb-inspector
 ```
+
+**IMPORTANT**: On Windows ensure you have `libusb-1.0.dll` in `C:\Windows\System32` or you will get a `NoBackendError`. You can get them from [here](https://libusb.info/).
 
 ## Example Usage
 

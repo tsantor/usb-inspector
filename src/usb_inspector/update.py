@@ -1,47 +1,100 @@
 import re
 import sqlite3
-import urllib.request
-from pathlib import Path
 
 import chardet
 import click
 import pandas as pd
+import requests
 
 from usb_inspector import data_file
 from usb_inspector import usb_db
 
 
-def dataframes_to_sqlite(vendors_df, devices_df):
+def create_database_schema():
     """
-    Writes two pandas DataFrames to a SQLite database with proper foreign key
-    relationship.
+    Create the SQLite database schema if it doesn't already exist.
+    """
+    conn = sqlite3.connect(usb_db)
+    conn.execute("PRAGMA foreign_keys = ON")
 
-    :param vendors_df: DataFrame containing vendor information.
-    :param devices_df: DataFrame containing device information.
-    :param db_name: The name of the SQLite database file.
+    # Create the vendors table
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vendors (
+            vendor_id TEXT PRIMARY KEY,
+            vendor_name TEXT NOT NULL
+        )
+        """
+    )
+
+    # Create the devices table
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS devices (
+            device_id TEXT NOT NULL,
+            device_name TEXT NOT NULL,
+            vendor_id TEXT NOT NULL,
+            FOREIGN KEY (vendor_id) REFERENCES vendors (vendor_id)
+        )
+        """
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def update_existing_database(vendors_df: pd.DataFrame, devices_df: pd.DataFrame):
     """
-    # Connect to the SQLite database (creates the file if it doesn't exist)
+    Update the existing SQLite database with new vendors and devices.
+
+    :param vendors_df: DataFrame containing new vendor information.
+    :param devices_df: DataFrame containing new device information.
+    """
+    # Connect to the SQLite database
     conn = sqlite3.connect(usb_db)
 
     # Enable foreign key support
     conn.execute("PRAGMA foreign_keys = ON")
 
-    # Write the vendors DataFrame to the vendors table
-    vendors_df.to_sql("vendors", conn, if_exists="replace", index=False)
+    # Load existing data from the database
+    existing_vendors = pd.read_sql("SELECT * FROM vendors", conn)
+    existing_devices = pd.read_sql("SELECT * FROM devices", conn)
 
-    # Write the devices DataFrame to the devices table
-    devices_df.to_sql("devices", conn, if_exists="replace", index=False)
+    # Find new vendors
+    new_vendors = vendors_df[
+        ~vendors_df["vendor_id"].isin(existing_vendors["vendor_id"])
+    ]
 
-    # Create indexes for better query performance
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_vendor_id ON vendors(vendor_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_device_vendor ON devices(vendor_id)")
+    # Find new devices
+    new_devices = devices_df[
+        ~devices_df[["device_id", "vendor_id"]]
+        .apply(tuple, axis=1)
+        .isin(existing_devices[["device_id", "vendor_id"]].apply(tuple, axis=1))
+    ]
+
+    # Insert new vendors into the database
+    if not new_vendors.empty:
+        new_vendors.to_sql("vendors", conn, if_exists="append", index=False)
+        click.secho(
+            f"✅ Added {len(new_vendors):,} new vendors to the database.",
+            fg="green",
+        )
+    else:
+        click.secho("No new vendors to add.", fg="yellow")
+
+    # Insert new devices into the database
+    if not new_devices.empty:
+        new_devices.to_sql("devices", conn, if_exists="append", index=False)
+        click.secho(
+            f"✅ Added {len(new_devices):,} new devices to the database.",
+            fg="green",
+        )
+    else:
+        click.secho("No new devices to add.", fg="yellow")
 
     # Commit and close the connection
     conn.commit()
     conn.close()
-    click.secho(f"✅ Data successfully written to **{Path(usb_db).name}**", fg="green")
-    click.echo(f"\t- Table 'vendors': {len(vendors_df):,} records")
-    click.echo(f"\t- Table 'devices': {len(devices_df):,} records")
 
 
 def parse_usb_ids_to_dataframes(data_string):
@@ -105,24 +158,24 @@ def parse_usb_ids_to_dataframes(data_string):
 
 
 def update_usb_db() -> bool:
-    """Update the USB database."""
+    """Update the USB database by adding new vendors and devices."""
     url = "http://www.linux-usb.org/usb.ids"
 
-    if Path(usb_db).exists():
-        click.secho(
-            (
-                f"⚠️ Database '{Path(usb_db).name}' already exists. "
-                "Remove it to recreate."
-            ),
-            fg="yellow",
-        )
-        return False
+    # Ensure the database schema exists
+    create_database_schema()
 
     # Download the latest usb.ids file if not present
     if not data_file.exists():
         click.echo(f"Downloading latest usb.ids file from '{url}'...")
-        urllib.request.urlretrieve(url, str(data_file))  # noqa: S310
-        click.secho("✅ Download complete.", fg="green")
+        try:
+            r = requests.get(url, timeout=5)
+            r.raise_for_status()
+            with data_file.open("wb") as f:
+                f.write(r.content)
+            click.secho("✅ Download complete.", fg="green")
+        except requests.exceptions.RequestException as e:
+            click.secho(f"❌ Failed to download usb.ids: {e}", fg="red")
+            return False
 
     # Run the parsing function
     with data_file.open("rb") as f:
@@ -133,12 +186,12 @@ def update_usb_db() -> bool:
     with data_file.open("r", encoding=detected_encoding) as f:
         data = f.read()
 
+    # Parse the new usb.ids file into DataFrames
     vendors_df, devices_df = parse_usb_ids_to_dataframes(data)
 
     click.secho("✅ Vendors DataFrame created successfully.", fg="green")
-    # click.echo(vendors_df.head(10).to_markdown(index=False))
     click.secho("✅ Devices DataFrame created successfully.", fg="green")
-    # click.echo(devices_df.head(10).to_markdown(index=False))
 
-    dataframes_to_sqlite(vendors_df, devices_df)
+    # Update the database with new data
+    update_existing_database(vendors_df, devices_df)
     return True
