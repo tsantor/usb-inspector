@@ -22,8 +22,9 @@ Command Line:
 usb-inspector lookup --vendor-id 1A40
 usb-inspector lookup --vendor-id 1A40 --device-id 0801
 
+# To manually update the USB DB
+usb-inspector delete-data
 usb-inspector update-db
-usb-inspector delete-db
 ```
 
 ```python

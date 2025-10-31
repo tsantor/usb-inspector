@@ -2,7 +2,6 @@ import logging
 from importlib import resources
 from pathlib import Path
 
-import click
 import platformdirs
 
 # Basic logger setup; users of this package can configure logging as needed
@@ -21,7 +20,13 @@ data_dir = Path(
     )
 )
 usb_db = data_dir / "usb_data.db"
-click.echo(f"Using USB database at: {usb_db}")
+# click.echo(f"Using USB database at: {usb_db}")
+
+if not usb_db.exists():
+    # If the database does not exist, create it by updating from usb.ids
+    from usb_inspector.update import update_usb_db
+
+    update_usb_db()
 
 
 __version__ = "0.1.2"
