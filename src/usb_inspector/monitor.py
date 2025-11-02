@@ -42,9 +42,11 @@ class USBDeviceMonitor:
 
     def get_device_uid(self, device) -> str:
         """
-        Generate unique identifier for a USB device in the format "vendor_id_device_id"
+        Generate unique identifier for a USB device in the format
+        "vendor_id_device_id"
         (e.g., "076b_5022") for the registry key.
-        The full UID (vendor:device:bus:address) is still used for *true* uniqueness on the system.
+        The full UID (vendor:device:bus:address) is still used for *true*
+        uniqueness on the system.
         """
         return f"{device.idVendor:04x}_{device.idProduct:04x}"
 
@@ -65,9 +67,7 @@ class USBDeviceMonitor:
             "bus": device.bus,
             "address": device.address,
             "uid": uid,  # Registry key identifier
-            "full_system_uid": self.get_full_system_uid(
-                device
-            ),  # System unique identifier
+            "full_system_uid": self.get_full_system_uid(device),
             "is_connected": True,  # Add connection status
         }
 

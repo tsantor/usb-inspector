@@ -17,4 +17,4 @@ All notable changes to this project will be documented in this file. This projec
 ## 0.1.3 (2025-10-31)
 
 - `update-db` cli command only adds new Vendors and Devices to the existing DB rather than requiring deletion and recreation of the DB.
-- Include Windows `libuseb-1.0.dll` in package data so it has a backend "out of the box".
+- Track which devices are connected/disconnected.
