@@ -5,6 +5,7 @@ import logging
 from collections.abc import Awaitable
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 import usb.core
 
@@ -201,6 +202,7 @@ class USBDeviceMonitor:
 
         # Register initial devices using the combined UID
         for dev in current_devices_list:
+            dev["last_seen"] = datetime.now().astimezone().isoformat()
             self.device_registry[dev["uid"]] = dev
 
         logger.info("Currently connected devices: %d", len(current_devices_list))
@@ -231,6 +233,11 @@ class USBDeviceMonitor:
                 removed_devices_uids = self.previous_devices_uids - current_device_uids
                 if removed_devices_uids:
                     await self._handle_removed_devices(removed_devices_uids)
+
+                # Update last_seen for currently connected devices
+                for dev in self.current_devices_list:
+                    dev["last_seen"] = datetime.now().astimezone().isoformat()
+                    self.device_registry[dev["uid"]] = dev
 
                 self.previous_devices_uids = current_device_uids
 
