@@ -23,7 +23,7 @@ help:
 
 PYTHON_VERSION=3.13.1
 package_name=usb_inspector
-package_version=0.1.3
+package_version=0.1.4
 aws_profile=xstudios
 s3_bucket=xstudios-pypi
 wheel_name=${package_name}-${package_version}-py3-none-any.whl
