@@ -40,18 +40,15 @@ env:  ## Create virtual environment (uses `uv`)
 env_remove:  ## Remove virtual environment
 	rm -rf .venv/
 
-env_recreate: env_remove env pip_install_editable  ## Recreate environment from scratch
+env_recreate: env_remove env pip_install_editable pip_install_dev  ## Recreate environment from scratch
 
 # -----------------------------------------------------------------------------
 # Pip
 # -----------------------------------------------------------------------------
 
 pip_install_editable:  ## Install in editable mode
-	uv sync --all-groups
-	uv pip install --no-deps -e .
-
-pip_install_build_tools:  ## Install build tools
-	uv pip install --upgrade twine pkginfo setuptools wheel build
+	uv pip install -e .
+	# --extra-index-url https://www.piwheels.org/simple
 
 pip_list:  ## Run pip list
 	uv pip list
@@ -62,30 +59,36 @@ pip_tree: ## Run pip tree
 pipdeptree:  ## # Run pipdeptree
 	uv run pipdeptree
 
-uv_sync:  ## Sync dependencies [production, dev, test]
-	uv sync --all-groups
+pip_install_dev:  ## Sync dependencies [production, dev, test]
+	uv sync --no-default-groups --group test --group dev
+
+uv_lock:	## Match lock file to current dependencies in pyproject.toml
+	uv lock
 
 uv_lock_check:	## Check if lock file is up to date
 	uv lock --check
+
+uv_sync:	## Sync dependencies from lock file
+	uv sync
 
 # -----------------------------------------------------------------------------
 # Testing
 # -----------------------------------------------------------------------------
 
 pytest:  ## Run tests
-	pytest -vx --cov --cov-report=html
+	uv run pytest -vx --cov --cov-report=html
 
 pytest_verbose:  ## Run tests in verbose mode
-	pytest -vvs --cov --cov-report=html
+	uv run pytest -vvs --cov --cov-report=html
 
 coverage:  ## Run tests with coverage
-	coverage run -m pytest && coverage html
+	uv run coverage run -m pytest && coverage html
 
 coverage_verbose:  ## Run tests with coverage in verbose mode
-	coverage run -m pytest -vss && coverage html
+	uv run coverage run -m pytest -vss && coverage html
 
 coverage_skip:  ## Run tests with coverage and skip covered
-	coverage run -m pytest -vs && coverage html --skip-covered
+	uv run coverage run -m pytest -vs && coverage html --skip-covered
 
 open_coverage:  ## Open coverage report
 	open htmlcov/index.html
@@ -95,13 +98,13 @@ open_coverage:  ## Open coverage report
 # -----------------------------------------------------------------------------
 
 ruff_format: ## Run ruff format
-	ruff format src/usb_inspector
+	uv run ruff format
 
 ruff_check: ## Run ruff check
-	ruff check src/usb_inspector
+	uv run ruff check
 
 ruff_clean: ## Run ruff clean
-	ruff clean
+	uv run ruff clean
 
 # -----------------------------------------------------------------------------
 # Cleanup

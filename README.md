@@ -13,7 +13,10 @@ It includes ability to manually update the USB DB without installing a new versi
 python3 -m pip install usb-inspector
 ```
 
-**IMPORTANT**: On Windows ensure you have `libusb-1.0.dll` in `C:\Windows\System32` or you will get a `NoBackendError`. You can get them from [here](https://libusb.info/).
+**IMPORTANT**: On Windows ensure you have `libusb-1.0.dll` (64bit) in `C:\Windows\System32` or you will get a `NoBackendError`. You can get them from [here](https://libusb.info/).
+
+### Raspberry Pi
+- Raspberry Pi 3B+ trixie aarch64 64bit
 
 ## Example Usage
 

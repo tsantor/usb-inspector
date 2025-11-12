@@ -4,9 +4,15 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+
 [project]
 name = "usb-inspector"
 description = "A cross-platform tool to monitor and inspect USB devices connected to the host system."
+dynamic = ["version", "readme"]
+requires-python = ">=3.11"
+authors = [
+  { name = "Tim Santor", email = "tsantor@xstudios.com" },
+]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -24,15 +30,6 @@ dependencies = [
     "platformdirs>=4.5.0",
     "pyusb>=1.3.1",
     "tabulate>=0.9.0",
-]
-# Rpi wheels for numpy
-# https://www.piwheels.org/simple/numpy/numpy-2.3.3-cp313-cp313-linux_armv7l.whl#sha256=af90003f13f74cc2555b2d3203e59aef676a353a4c9329831985017a6fa6d257
-# https://www.piwheels.org/simple/pandas/pandas-2.3.3-cp313-cp313-linux_armv7l.whl#sha256=12b008e49cecf3df6d8f0ac3240e711dbfe50d58a85daeb337c5df328012abb5
-
-dynamic = ["version", "readme"]
-requires-python = ">=3.11"
-authors = [
-  { name = "Tim Santor", email = "tsantor@xstudios.com" },
 ]
 
 [dependency-groups]

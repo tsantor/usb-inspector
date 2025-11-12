@@ -1,7 +1,6 @@
 import subprocess
+import tomllib
 from pathlib import Path
-
-import toml
 
 
 def update_pyproject_toml():
@@ -14,8 +13,8 @@ def update_pyproject_toml():
         uv lock --upgrade
         uv sync --all-groups
     """
-    with Path("pyproject.toml").open("r") as file:
-        pyproject = toml.load(file)
+    with Path("pyproject.toml").open("rb") as file:
+        pyproject = tomllib.load(file)
 
     dependencies = pyproject["project"]["dependencies"]
     for dependency in dependencies:
