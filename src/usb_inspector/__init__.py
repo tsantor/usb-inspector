@@ -29,4 +29,4 @@ if not usb_db.exists():
     update_usb_db()
 
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"

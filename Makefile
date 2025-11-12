@@ -23,7 +23,7 @@ help:
 
 PYTHON_VERSION=3.13.1
 package_name=usb_inspector
-package_version=0.1.4
+package_version=0.1.5
 aws_profile=xstudios
 s3_bucket=xstudios-pypi
 wheel_name=${package_name}-${package_version}-py3-none-any.whl
@@ -190,7 +190,7 @@ dependency_urls: requirements_dependency pyproject_dependency ## Generate depend
 
 user=pi
 host=raspi3b-2.local
-remote_dir=/home/pi/Projects/my-pypi-packages/usb-inspector
+remote_dir=/home/pi/Sandbox/Python/my-pypi-packages/usb-inspector
 
 rsync_to_pi:	## Sync files to Raspberry Pi
 	rsync -avz . ${user}@${host}:${remote_dir} --delete \
