@@ -264,12 +264,7 @@ class USBDeviceMonitor:
         self._monitoring = False
 
     def get_all_devices(self) -> dict[str, dict[str, any]]:
-        """
-        Get all devices that have been seen by the monitor.
-
-        Returns:
-            Dictionary mapping combined UID (vendor_id_device_id) to device info (includes is_connected status)
-        """
+        """Get all devices that have been seen by the monitor."""
         return self.device_registry.copy()
 
     def get_connected_devices(self) -> list[dict[str, any]]:
