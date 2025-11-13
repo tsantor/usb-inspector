@@ -134,6 +134,8 @@ clean_coverage:  ## Clear coverage cache
 
 clean_tests: clean_pytest_cache clean_ruff_cache clean_tox_cache clean_coverage  ## Clear pytest, ruff, tox, and coverage caches
 
+clean_all: clean clean_tests  ## Full cleanup
+
 # -----------------------------------------------------------------------------
 # Miscellaneous
 # -----------------------------------------------------------------------------
@@ -149,13 +151,13 @@ dist: clean ## Builds source and wheel package
 	uv run python3 -m build
 
 twine_upload_test: dist ## Upload package to pypi test
-	twine upload dist/* -r pypitest
+	uv run twine upload dist/* -r pypitest
 
 twine_upload: dist ## Package and upload a release
-	twine upload dist/*
+	uv run twine upload dist/*
 
 twine_check: dist ## Twine check
-	twine check dist/*
+	uv run twine check dist/*
 
 twine_fix: ## Fix twine issues
 	uv pip install -U twine pkginfo
@@ -172,24 +174,10 @@ push_to_s3:  ## Push distro to S3 bucket
         --exclude "*" --include "*.whl"
 	echo "${package_url}"
 
-requirements_dependency:	## Generate secure URL
-	@sha256=$$(openssl sha256 dist/${wheel_name} | awk '{print $$2}'); \
-	echo "${package_name} @ ${package_url}?sha256=$$sha256"
-
-pyproject_dependency:	## Dependency line for pyproject.toml
-	@sha256=$$(openssl sha256 dist/${wheel_name} | awk '{print $$2}'); \
-	echo "${package_name}" = { url = "${package_url}", hash = "sha256=$$sha256" }
-
-dependency_urls: requirements_dependency pyproject_dependency ## Generate dependency URLs
-
 # END - Generic commands
 # -----------------------------------------------------------------------------
 # Project Specific
 # -----------------------------------------------------------------------------
-
-# user=pi
-# host=raspberrypi.local
-# remote_dir=/home/pi/Sandbox/Python/my-pypi-packages/usb-inspector
 
 user=pi
 host=raspi3b-2.local
