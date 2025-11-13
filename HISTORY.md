@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file. This projec
 
 ## 0.1.7 (2025-11-13)
 - FIXED `is_connected` bug introduced in last patch.
+- ADDED improved tracking of devices allowing multiple of the same vendor/device ID to be connected.
 
 ## 0.1.6 (2025-11-13)
 - FIXED `last_seen` timestamp for each device, only updates when connected/disonnected.
