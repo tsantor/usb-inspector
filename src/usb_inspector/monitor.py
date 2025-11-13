@@ -32,24 +32,18 @@ class USBDeviceMonitor:
         Args:
             poll_interval: Time in seconds between device checks
         """
+        self._shutdown_event = asyncio.Event()
         self.poll_interval = poll_interval
-        self.previous_devices_uids = set()  # Changed to store UIDs
-        self.current_devices_list = []
+        self.previous_system_uids = (
+            set()
+        )  # Track full system UIDs (includes bus/address)
         self._monitoring = False
-        # Track all devices we've ever seen with their full details
-        # Key is now a combined identifier: "vendor_id_device_id" (e.g., "076b_5022")
-        self.device_registry = {}  # key: str (UID), value: device info dict
+        # Registry uses simple UID (vendor_device) as key
+        # This tracks device info but not multiple instances
+        self.device_registry = {}  # key: str (simple UID), value: device info dict
+        # Track currently connected devices with full system info
+        self.connected_devices = {}  # key: full_system_uid, value: device info
         self._callback = None
-
-    def get_device_uid(self, device) -> str:
-        """
-        Generate unique identifier for a USB device in the format
-        "vendor_id_device_id"
-        (e.g., "076b_5022") for the registry key.
-        The full UID (vendor:device:bus:address) is still used for *true*
-        uniqueness on the system.
-        """
-        return f"{device.idVendor:04x}_{device.idProduct:04x}"
 
     def get_full_system_uid(self, device) -> str:
         """Generate unique identifier for a USB device including bus/address"""
@@ -59,7 +53,10 @@ class USBDeviceMonitor:
         """Extract detailed information from a USB device"""
         vendor_id_str = f"{device.idVendor:04x}"
         device_id_str = f"{device.idProduct:04x}"
-        uid = f"{vendor_id_str}_{device_id_str}"  # New registry key
+        simple_uid = f"{vendor_id_str}_{device_id_str}"
+        full_system_uid = self.get_full_system_uid(device)
+
+        timestamp = datetime.now().astimezone().isoformat()
 
         info = {
             "device_id": device_id_str,
@@ -67,11 +64,13 @@ class USBDeviceMonitor:
             "version": device.bcdDevice,
             "bus": device.bus,
             "address": device.address,
-            "uid": uid,  # Registry key identifier
-            "full_system_uid": self.get_full_system_uid(device),
+            "uid": simple_uid,  # Simple identifier
+            "full_system_uid": full_system_uid,  # Full unique identifier
+            "is_connected": True,
+            "last_seen": timestamp,
         }
 
-        # Try to get manufacturer and product strings (may fail without permissions)
+        # Try to get manufacturer and product strings
         try:
             info["vendor_name_short"] = device.manufacturer
         except (ValueError, usb.core.USBError, NotImplementedError):
@@ -118,67 +117,74 @@ class USBDeviceMonitor:
         """Synchronous helper for device enumeration"""
         return [self.get_device_info(device) for device in usb.core.find(find_all=True)]
 
-    async def _handle_new_devices(self, new_uids: set[str]):
+    async def _handle_new_devices(self, new_devices: list[dict[str, any]]):
         """Handle newly connected devices and call callback if provided."""
-        for dev in self.current_devices_list:
-            if dev["uid"] in new_uids:
-                # Register/update device in registry
-                dev["is_connected"] = True
-                dev["last_seen"] = datetime.now().astimezone().isoformat()
-                self.device_registry[dev["uid"]] = dev
+        timestamp = datetime.now().astimezone().isoformat()
 
-                manufacturer = dev.get("vendor_name", None)
-                product = dev.get("device_name", None)
-                logger.info(
-                    "[CONNECTED] - %s %s (%s:%s)",
-                    manufacturer,
-                    product,
-                    dev.get("vendor_id"),
-                    dev.get("device_id"),
-                )
-                if self._callback:
-                    await self._callback("connected", dev)
+        for dev in new_devices:
+            # Update registry with latest info (using simple UID)
+            self.device_registry[dev["uid"]] = {
+                **dev,
+                "is_connected": True,
+                "last_seen": timestamp,
+            }
 
-    async def _handle_removed_devices(self, removed_uids: set[str]):
+            # Add to connected devices tracking (using full system UID)
+            self.connected_devices[dev["full_system_uid"]] = dev
+
+            manufacturer = dev.get("vendor_name", "Unknown")
+            product = dev.get("device_name", "Unknown")
+            logger.info(
+                "[CONNECTED] - %s %s (%s:%s) [%s]",
+                manufacturer,
+                product,
+                dev["vendor_id"],
+                dev["device_id"],
+                dev["full_system_uid"],
+            )
+
+            if self._callback:
+                await self._callback("connected", dev)
+
+    async def _handle_removed_devices(self, removed_system_uids: set[str]):
         """Handle disconnected devices and call callback if provided."""
-        for dev_uid in removed_uids:
-            # Get full device info from registry
-            if dev_uid in self.device_registry:
-                dev = self.device_registry[dev_uid].copy()
-                dev["is_connected"] = False
-                dev["last_seen"] = datetime.now().astimezone().isoformat()
-                self.device_registry[dev_uid] = dev
+        timestamp = datetime.now().astimezone().isoformat()
 
-                manufacturer = dev.get("vendor_name", None)
-                product = dev.get("device_name", None)
+        for full_system_uid in removed_system_uids:
+            # Get device info from connected_devices
+            dev = self.connected_devices.get(full_system_uid)
+
+            if dev:
+                # Update registry (using simple UID)
+                simple_uid = dev["uid"]
+                self.device_registry[simple_uid] = {
+                    **dev,
+                    "is_connected": False,
+                    "last_seen": timestamp,
+                }
+
+                # Remove from connected devices
+                del self.connected_devices[full_system_uid]
+
+                manufacturer = dev.get("vendor_name", "Unknown")
+                product = dev.get("device_name", "Unknown")
                 logger.info(
-                    "[DISCONNECTED] - %s %s (%s:%s)",
+                    "[DISCONNECTED] - %s %s (%s:%s) [%s]",
                     manufacturer,
                     product,
-                    dev.get("vendor_id"),
-                    dev.get("device_id"),
+                    dev["vendor_id"],
+                    dev["device_id"],
+                    full_system_uid,
                 )
+
                 if self._callback:
                     await self._callback("disconnected", dev)
             else:
-                # Fallback if device wasn't in registry (shouldn't happen with correct UID logic)
-                logger.info(
-                    "[DISCONNECTED] Device %s (UID not found in registry)", dev_uid
+                # Shouldn't happen, but log if it does
+                logger.warning(
+                    "[DISCONNECTED] Device %s not found in connected_devices",
+                    full_system_uid,
                 )
-                if self._callback:
-                    # Provide minimal info for the disconnected event
-                    vendor_id, device_id = (
-                        dev_uid.split("_") if "_" in dev_uid else (None, None)
-                    )
-                    await self._callback(
-                        "disconnected",
-                        {
-                            "uid": dev_uid,
-                            "vendor_id": vendor_id,
-                            "device_id": device_id,
-                            "is_connected": False,
-                        },
-                    )
 
     async def monitor(
         self, callback: Callable[[str, dict], Awaitable[None]] | None = None
@@ -194,56 +200,82 @@ class USBDeviceMonitor:
         logger.info("Starting USB device monitor...")
 
         self._monitoring = True
-        self._callback = callback  # Store callback for use in helper methods
+        self._callback = callback
 
         # Get initial device list
-        current_devices_list = await self.get_current_devices()
-        self.previous_devices_uids = {dev["uid"] for dev in current_devices_list}
+        initial_devices = await self.get_current_devices()
 
-        # Register initial devices using the combined UID
-        for dev in current_devices_list:
-            dev["last_seen"] = datetime.now().astimezone().isoformat()
-            self.device_registry[dev["uid"]] = dev
+        # Initialize tracking structures
+        for dev in initial_devices:
+            simple_uid = dev["uid"]
+            full_system_uid = dev["full_system_uid"]
 
-        logger.info("Currently connected devices: %d", len(current_devices_list))
-        for dev in current_devices_list:
-            manufacturer = dev.get("vendor_name", None)
-            product = dev.get("device_name", None)
+            # Add to registry
+            self.device_registry[simple_uid] = dev
+
+            # Add to connected devices
+            self.connected_devices[full_system_uid] = dev
+
+            # Track system UID
+            self.previous_system_uids.add(full_system_uid)
+
+        logger.info("Currently connected devices: %d", len(initial_devices))
+        for dev in initial_devices:
+            manufacturer = dev.get("vendor_name", "Unknown")
+            product = dev.get("device_name", "Unknown")
             logger.info(
-                "  - %s %s (%s)",
+                "  - %s %s (%s) [%s]",
                 manufacturer,
                 product,
-                dev.get("uid"),
+                dev["uid"],
+                dev["full_system_uid"],
             )
 
         try:
             while self._monitoring:
                 # start_time = time.perf_counter()
-
                 # Get current devices
-                self.current_devices_list = await self.get_current_devices()
-                current_device_uids = {dev["uid"] for dev in self.current_devices_list}
+                current_devices_list = await self.get_current_devices()
+                current_system_uids = {
+                    dev["full_system_uid"] for dev in current_devices_list
+                }
 
                 # Find newly connected devices
-                new_devices_uids = current_device_uids - self.previous_devices_uids
-                if new_devices_uids:
-                    await self._handle_new_devices(new_devices_uids)
+                new_system_uids = current_system_uids - self.previous_system_uids
+                if new_system_uids:
+                    new_devices = [
+                        dev
+                        for dev in current_devices_list
+                        if dev["full_system_uid"] in new_system_uids
+                    ]
+                    # logger.debug("New devices: %s", new_system_uids)
+                    await self._handle_new_devices(new_devices)
 
                 # Find disconnected devices
-                removed_devices_uids = self.previous_devices_uids - current_device_uids
-                if removed_devices_uids:
-                    await self._handle_removed_devices(removed_devices_uids)
+                removed_system_uids = self.previous_system_uids - current_system_uids
+                if removed_system_uids:
+                    # logger.debug("Removed devices: %s", removed_system_uids)
+                    await self._handle_removed_devices(removed_system_uids)
 
-                # Update last_seen for currently connected devices
-                for dev in self.current_devices_list:
-                    dev["last_seen"] = datetime.now().astimezone().isoformat()
-                    self.device_registry[dev["uid"]] = dev
+                # Update last_seen for all currently connected devices
+                timestamp = datetime.now().astimezone().isoformat()
+                for dev in current_devices_list:
+                    simple_uid = dev["uid"]
+                    full_system_uid = dev["full_system_uid"]
 
-                self.previous_devices_uids = current_device_uids
+                    # Update registry
+                    if simple_uid in self.device_registry:
+                        self.device_registry[simple_uid]["last_seen"] = timestamp
 
-                # end_time = time.perf_counter()  # End timing
-                # elapsed_time = end_time - start_time
-                # logger.info("Poll duration: %.4f seconds", elapsed_time)
+                    # Update connected devices tracking
+                    if full_system_uid in self.connected_devices:
+                        self.connected_devices[full_system_uid]["last_seen"] = timestamp
+
+                # Update tracking set
+                self.previous_system_uids = current_system_uids
+
+                # elapsed = time.perf_counter() - start_time
+                # logger.debug("USB monitor iteration took %.3f seconds", elapsed)
 
                 await asyncio.sleep(self.poll_interval)
 
@@ -268,12 +300,8 @@ class USBDeviceMonitor:
         return self.device_registry.copy()
 
     def get_connected_devices(self) -> list[dict[str, any]]:
-        """Get list of currently connected devices from registry"""
-        return [
-            dev
-            for dev in self.device_registry.values()
-            if dev.get("is_connected", False)
-        ]
+        """Get list of currently connected devices"""
+        return list(self.connected_devices.values())
 
     def get_disconnected_devices(self) -> list[dict[str, any]]:
         """Get list of previously connected but now disconnected devices"""

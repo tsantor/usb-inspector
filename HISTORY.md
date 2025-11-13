@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.1.7 (2025-11-13)
+- FIXED `is_connected` bug introduced in last patch.
+
 ## 0.1.6 (2025-11-13)
 - FIXED `last_seen` timestamp for each device, only updates when connected/disonnected.
 
