@@ -69,7 +69,6 @@ class USBDeviceMonitor:
             "address": device.address,
             "uid": uid,  # Registry key identifier
             "full_system_uid": self.get_full_system_uid(device),
-            "is_connected": True,  # Add connection status
         }
 
         # Try to get manufacturer and product strings (may fail without permissions)
@@ -124,6 +123,8 @@ class USBDeviceMonitor:
         for dev in self.current_devices_list:
             if dev["uid"] in new_uids:
                 # Register/update device in registry
+                dev["is_connected"] = True
+                dev["last_seen"] = datetime.now().astimezone().isoformat()
                 self.device_registry[dev["uid"]] = dev
 
                 manufacturer = dev.get("vendor_name", None)
@@ -143,23 +144,22 @@ class USBDeviceMonitor:
         for dev_uid in removed_uids:
             # Get full device info from registry
             if dev_uid in self.device_registry:
-                dev_info = self.device_registry[dev_uid].copy()
-                dev_info["is_connected"] = False
-                self.device_registry[dev_uid] = (
-                    dev_info  # Update connection status in registry
-                )
+                dev = self.device_registry[dev_uid].copy()
+                dev["is_connected"] = False
+                dev["last_seen"] = datetime.now().astimezone().isoformat()
+                self.device_registry[dev_uid] = dev
 
-                manufacturer = dev_info.get("vendor_name", None)
-                product = dev_info.get("device_name", None)
+                manufacturer = dev.get("vendor_name", None)
+                product = dev.get("device_name", None)
                 logger.info(
                     "[DISCONNECTED] - %s %s (%s:%s)",
                     manufacturer,
                     product,
-                    dev_info.get("vendor_id"),
-                    dev_info.get("device_id"),
+                    dev.get("vendor_id"),
+                    dev.get("device_id"),
                 )
                 if self._callback:
-                    await self._callback("disconnected", dev_info)
+                    await self._callback("disconnected", dev)
             else:
                 # Fallback if device wasn't in registry (shouldn't happen with correct UID logic)
                 logger.info(

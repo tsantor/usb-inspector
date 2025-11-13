@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.1.6 (2025-11-13)
+- FIXED `last_seen` timestamp for each device, only updates when connected/disonnected.
+
 ## 0.1.5 (2025-11-05)
 - Locked `pandas` to version 2.3.3 for Raspberry Pi compatability (it pulls the pre-built wheel from piwheels.org)
 
