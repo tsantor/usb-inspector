@@ -6,7 +6,7 @@ import platformdirs
 
 # Basic logger setup; users of this package can configure logging as needed
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.ERROR)
 
 
 data_file = resources.files("usb_inspector.data") / "usb.ids"
@@ -29,4 +29,4 @@ if not usb_db.exists():
     update_usb_db()
 
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"

@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.1.8 (2025-11-20)
+- FIXED turned default packaged logging to `ERROR`. Was `INFO`...Sorry!
+
 ## 0.1.7 (2025-11-13)
 - FIXED `is_connected` bug introduced in last patch.
 - ADDED improved tracking of devices allowing multiple of the same vendor/device ID to be connected.
