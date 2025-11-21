@@ -23,6 +23,8 @@ class UsbData:
 class USBDeviceMonitor:
     """Cross-platform async USB device monitor using pyusb"""
 
+    usb_details_cache = {}
+
     def __init__(self, poll_interval: float = 1.0):
         """
         Initialize the USB monitor
@@ -46,9 +48,9 @@ class USBDeviceMonitor:
 
     def get_simple_uid(self, device) -> str:
         """
-        Generate simple identifier for device type: "vendor_id_device_id"
+        Generate simple identifier for device type: "vendor_id:device_id"
         """
-        return f"{device.idVendor:04x}_{device.idProduct:04x}"
+        return f"{device.idVendor:04x}:{device.idProduct:04x}"
 
     def get_full_system_uid(self, device) -> str:
         """Generate unique identifier for a USB device including bus/address"""
@@ -91,17 +93,18 @@ class USBDeviceMonitor:
         except (ValueError, usb.core.USBError, NotImplementedError):
             info["serial"] = None
 
-        # Lookup additional details from the USB database
-        details = lookup_usb_details(info["vendor_id"], info["device_id"])
+        # Check if details are already cached
+        cache_key = f"{info['vendor_id']}:{info['device_id']}"
+        if cache_key not in self.usb_details_cache:
+            # Lookup additional details from the USB database
+            details = lookup_usb_details(info["vendor_id"], info["device_id"])
+            self.usb_details_cache[cache_key] = details
+        else:
+            details = self.usb_details_cache[cache_key]
+
         if details:
             info["vendor_name"] = details.get("vendor_name", "Unknown")
             if info["device_name"] is None:
-                logger.debug(
-                    "Found device name for %s:%s: %s",
-                    info["vendor_id"],
-                    info["device_id"],
-                    details.get("device_name", "Unknown"),
-                )
                 info["device_name"] = details.get("device_name", "Unknown")
         else:
             info["vendor_name"] = "Unknown"
