@@ -52,9 +52,45 @@ class USBDeviceMonitor:
         """
         return f"{device.idVendor:04x}:{device.idProduct:04x}"
 
+    def get_port_path(self, device) -> str:
+        """
+        Get the physical port path for a device.
+        This is more stable than bus:address across reconnections.
+        """
+        try:
+            # port_numbers is a tuple representing the physical USB port path
+            # e.g., (1, 2) means hub port 1, then port 2
+            if hasattr(device, "port_numbers") and device.port_numbers:
+                return ".".join(str(p) for p in device.port_numbers)
+        except (AttributeError, ValueError, usb.core.USBError):
+            pass
+        return None
+
     def get_full_system_uid(self, device) -> str:
-        """Generate unique identifier for a USB device including bus/address"""
-        return f"{device.idVendor:04x}:{device.idProduct:04x}:{device.bus}:{device.address}"
+        """
+        Generate unique identifier for a USB device.
+        Priority order:
+        1. Serial number (if available) - most stable
+        2. Bus + port path - stable for same physical port
+        3. Bus + address - fallback (may change on reconnect)
+        """
+        vendor_device = f"{device.idVendor:04x}:{device.idProduct:04x}"
+
+        # Try to get serial number (most stable)
+        try:
+            serial = device.serial_number
+            if serial:
+                return f"{vendor_device}:sn_{serial}"
+        except (ValueError, usb.core.USBError, NotImplementedError):
+            pass
+
+        # Try to use port path (stable for same physical port)
+        port_path = self.get_port_path(device)
+        if port_path:
+            return f"{vendor_device}:bus{device.bus}:port{port_path}"
+
+        # Fall back to bus:address (may change on reconnect)
+        return f"{vendor_device}:{device.bus}:{device.address}"
 
     def get_device_info(self, device) -> dict[str, any]:
         """Extract detailed information from a USB device"""
@@ -62,6 +98,7 @@ class USBDeviceMonitor:
         device_id_str = f"{device.idProduct:04x}"
         simple_uid = f"{vendor_id_str}_{device_id_str}"
         full_system_uid = self.get_full_system_uid(device)
+        port_path = self.get_port_path(device)
 
         timestamp = datetime.now().astimezone().isoformat()
 
@@ -70,6 +107,7 @@ class USBDeviceMonitor:
             "vendor_id": vendor_id_str,
             "version": device.bcdDevice,
             "bus": device.bus,
+            "port": port_path,
             "address": device.address,
             "uid": simple_uid,  # Simple identifier (device type)
             "full_system_uid": full_system_uid,  # Full unique identifier
@@ -77,7 +115,7 @@ class USBDeviceMonitor:
             "last_seen": timestamp,
         }
 
-        # Try to get manufacturer and product strings
+        # Try to get manufacturer and product stringsx
         try:
             info["vendor_name_short"] = device.manufacturer
         except (ValueError, usb.core.USBError, NotImplementedError):
@@ -132,17 +170,26 @@ class USBDeviceMonitor:
             simple_uid = dev["uid"]
             full_system_uid = dev["full_system_uid"]
 
-            # Update device info
-            dev["is_connected"] = True
-            dev["last_seen"] = timestamp
+            # Check if this device was previously seen (by full_system_uid)
+            # If so, update its bus/address and mark as reconnected
+            if full_system_uid in self.device_registry:
+                # Device reconnected - update bus/address which may have changed
+                old_dev = self.device_registry[full_system_uid]
+                old_dev["bus"] = dev["bus"]
+                old_dev["address"] = dev["address"]
+                old_dev["is_connected"] = True
+                old_dev["last_seen"] = timestamp
+                dev = old_dev  # Use the existing device record
+            else:
+                # Brand new device
+                dev["is_connected"] = True
+                dev["last_seen"] = timestamp
+                self.device_registry[full_system_uid] = dev
 
-            # Add to main registry (keyed by full system UID)
-            self.device_registry[full_system_uid] = dev
-
-            # Update type index
-            if simple_uid not in self.devices_by_type:
-                self.devices_by_type[simple_uid] = set()
-            self.devices_by_type[simple_uid].add(full_system_uid)
+                # Update type index
+                if simple_uid not in self.devices_by_type:
+                    self.devices_by_type[simple_uid] = set()
+                self.devices_by_type[simple_uid].add(full_system_uid)
 
             manufacturer = dev.get("vendor_name", "Unknown")
             product = dev.get("device_name", "Unknown")
@@ -157,11 +204,9 @@ class USBDeviceMonitor:
             )
 
             logger.info(
-                "[CONNECTED] - %s %s (%s:%s) [%s] (device %d of this type)",
+                "[CONNECTED] - %s %s ('%s') (device %d of this type)",
                 manufacturer,
                 product,
-                dev["vendor_id"],
-                dev["device_id"],
                 full_system_uid,
                 connected_count,
             )
@@ -197,11 +242,9 @@ class USBDeviceMonitor:
                 )
 
                 logger.info(
-                    "[DISCONNECTED] - %s %s (%s:%s) [%s] (%d of this type still connected)",
+                    "[DISCONNECTED] - %s %s ('%s') (device %d of this type)",
                     manufacturer,
                     product,
-                    dev["vendor_id"],
-                    dev["device_id"],
                     full_system_uid,
                     connected_count,
                 )
@@ -254,10 +297,9 @@ class USBDeviceMonitor:
             manufacturer = dev.get("vendor_name", "Unknown")
             product = dev.get("device_name", "Unknown")
             logger.info(
-                "  - %s %s (%s) [%s]",
+                "  - %s %s ('%s')",
                 manufacturer,
                 product,
-                dev["uid"],
                 dev["full_system_uid"],
             )
 
@@ -362,7 +404,7 @@ class USBDeviceMonitor:
         Get a specific device instance by its full system UID.
 
         Args:
-            full_system_uid: Full system identifier (e.g., "076b:5022:1:5")
+            full_system_uid: Full system identifier (e.g., "076b:5022:sn_ABC123")
 
         Returns:
             Device info dict or None if not found

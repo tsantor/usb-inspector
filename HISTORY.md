@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+
+## 0.2.0 (2025-11-21)
+- FIXED Connecting/Disconnecting the same physical device to the same port now correctly identifies the device as the same device on Windows/Linux.
+
 ## 0.1.9 (2025-11-21)
 - FIXED Cached sql db lookup so it occurs only once.
 
