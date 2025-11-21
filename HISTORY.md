@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.1.9 (2025-11-21)
+- FIXED Cached sql db lookup so it occurs only once.
+
 ## 0.1.8 (2025-11-20)
 - FIXED turned default packaged logging to `ERROR`. Was `INFO`...Sorry!
 

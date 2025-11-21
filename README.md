@@ -10,6 +10,8 @@ It includes ability to manually update the USB DB without installing a new versi
 ## Installation
 
 ```bash
+uv add usb-inspector
+# via pip
 python3 -m pip install usb-inspector
 ```
 
