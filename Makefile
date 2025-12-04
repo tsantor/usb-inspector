@@ -177,7 +177,8 @@ push_to_s3:  ## Push distro to S3 bucket
 # -----------------------------------------------------------------------------
 
 user=pi
-host=raspi3b-2.local
+# host=raspi3b-2.local
+host=192.168.1.161
 remote_dir=/home/pi/Sandbox/Python/my-pypi-packages/usb-inspector
 
 rsync_to_pi:	## Sync files to Raspberry Pi
