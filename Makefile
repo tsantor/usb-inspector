@@ -46,7 +46,6 @@ env_recreate: env_remove env pip_install_editable pip_install_dev  ## Recreate e
 
 pip_install_editable:  ## Install in editable mode
 	uv pip install -e .
-	# --extra-index-url https://www.piwheels.org/simple
 
 pip_list:  ## Run pip list
 	uv pip list
