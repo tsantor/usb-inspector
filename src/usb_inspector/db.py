@@ -2,8 +2,6 @@ import logging
 import sqlite3
 from pathlib import Path
 
-import click
-
 from usb_inspector import data_file
 from usb_inspector import usb_db
 
@@ -46,29 +44,29 @@ def lookup_usb_details(vendor_id, device_id=None) -> dict | None:
                     "device_id": device_id,
                     "device_name": result[1],
                 }
-        else:
-            # Only vendor_id provided - lookup in vendors table
-            query = """
-            SELECT vendor_name
-            FROM vendors
-            WHERE vendor_id = ?
-            LIMIT 1;
-            """
-            cursor.execute(query, (vendor_id,))
-            result = cursor.fetchone()
 
-            if result:
-                return {
-                    "vendor_id": vendor_id,
-                    "vendor_name": result[0],
-                    "device_id": None,
-                    "device_name": None,
-                }
+        # Only vendor_id provided - lookup in vendors table
+        query = """
+        SELECT vendor_name
+        FROM vendors
+        WHERE vendor_id = ?
+        LIMIT 1;
+        """
+        cursor.execute(query, (vendor_id,))
+        result = cursor.fetchone()
+
+        if result:
+            return {
+                "vendor_id": vendor_id,
+                "vendor_name": result[0],
+                "device_id": None,
+                "device_name": None,
+            }
 
         # No vendor match found at all
-        return None
+        return result
 
-    except sqlite3.Error:
+    except sqlite3.Error:  # pragma: no cover
         logger.exception("Database error during USB lookup")
         return None
     finally:

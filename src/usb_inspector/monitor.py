@@ -2,7 +2,6 @@ import asyncio
 import logging
 from collections.abc import Awaitable
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime
 
 import usb.core
@@ -12,37 +11,20 @@ from usb_inspector.db import lookup_usb_details
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class UsbData:
-    vendor_id: str
-    bus: int
-    address: int
-    device_id: str
-
-
 class USBDeviceMonitor:
     """Cross-platform async USB device monitor using pyusb"""
 
     usb_details_cache = {}
 
     def __init__(self, poll_interval: float = 1.0):
-        """
-        Initialize the USB monitor
-
-        Args:
-            poll_interval: Time in seconds between device checks
-        """
         self._shutdown_event = asyncio.Event()
-        self.poll_interval = poll_interval
-        self.previous_system_uids = set()  # Track full system UIDs
-        self._monitoring = False
+        self._loop_interval = poll_interval
+        self.previous_system_uids = set()
 
         # Primary registry: tracks ALL device instances by full system UID
-        self.device_registry = {}  # key: full_system_uid, value: device info dict
-
+        self.device_registry = {}
         # Secondary index: tracks which full system UIDs belong to each device type
-        # This allows looking up "all printers of type X" efficiently
-        self.devices_by_type = {}  # key: simple_uid, value: set of full_system_uids
+        self.devices_by_type = {}
 
         self._callback = None
 
@@ -52,20 +34,6 @@ class USBDeviceMonitor:
         """
         return f"{device.idVendor:04x}:{device.idProduct:04x}"
 
-    def get_port_path(self, device) -> str:
-        """
-        Get the physical port path for a device.
-        This is more stable than bus:address across reconnections.
-        """
-        try:
-            # port_numbers is a tuple representing the physical USB port path
-            # e.g., (1, 2) means hub port 1, then port 2
-            if hasattr(device, "port_numbers") and device.port_numbers:
-                return ".".join(str(p) for p in device.port_numbers)
-        except (AttributeError, ValueError, usb.core.USBError):
-            pass
-        return None
-
     def get_full_system_uid(self, device) -> str:
         """
         Generate unique identifier for a USB device.
@@ -74,7 +42,7 @@ class USBDeviceMonitor:
         2. Bus + port path - stable for same physical port
         3. Bus + address - fallback (may change on reconnect)
         """
-        vendor_device = f"{device.idVendor:04x}:{device.idProduct:04x}"
+        vendor_device = self.get_simple_uid(device)
 
         # Try to get serial number (most stable)
         try:
@@ -91,6 +59,20 @@ class USBDeviceMonitor:
 
         # Fall back to bus:address (may change on reconnect)
         return f"{vendor_device}:{device.bus}:{device.address}"
+
+    def get_port_path(self, device) -> str | None:
+        """
+        Get the physical port path for a device.
+        This is more stable than bus:address across reconnections.
+        """
+        try:
+            # port_numbers is a tuple representing the physical USB port path
+            # e.g., (1, 2) means hub port 1, then port 2
+            if hasattr(device, "port_numbers") and device.port_numbers:
+                return ".".join(str(p) for p in device.port_numbers)
+        except (AttributeError, ValueError, usb.core.USBError):  # pragma: no cover
+            pass
+        return None
 
     def get_device_info(self, device) -> dict[str, any]:
         """Extract detailed information from a USB device"""
@@ -115,20 +97,20 @@ class USBDeviceMonitor:
             "last_seen": timestamp,
         }
 
-        # Try to get manufacturer and product stringsx
+        # Try to get manufacturer and product strings
         try:
             info["vendor_name_short"] = device.manufacturer
-        except (ValueError, usb.core.USBError, NotImplementedError):
+        except (ValueError, usb.core.USBError, NotImplementedError):  # pragma: no cover
             info["vendor_name_short"] = None
 
         try:
             info["device_name"] = device.product
-        except (ValueError, usb.core.USBError, NotImplementedError):
+        except (ValueError, usb.core.USBError, NotImplementedError):  # pragma: no cover
             info["device_name"] = None
 
         try:
             info["serial"] = device.serial_number
-        except (ValueError, usb.core.USBError, NotImplementedError):
+        except (ValueError, usb.core.USBError, NotImplementedError):  # pragma: no cover
             info["serial"] = None
 
         # Check if details are already cached
@@ -257,24 +239,10 @@ class USBDeviceMonitor:
                     full_system_uid,
                 )
 
-    async def monitor(
-        self, callback: Callable[[str, dict], Awaitable[None]] | None = None
-    ):
-        """
-        Monitor USB devices for changes (async)
-
-        Args:
-            callback: Optional async function to call when devices change.
-                     Receives (event_type, device_info) where event_type is
-                     'connected' or 'disconnected'
-        """
-        logger.info("Starting USB device monitor...")
-
-        self._monitoring = True
-        self._callback = callback
-
+    async def init_tracking(self) -> None:
         # Get initial device list
         initial_devices = await self.get_current_devices()
+        logger.info("Currently connected devices: %d", len(initial_devices))
 
         # Initialize tracking structures
         for dev in initial_devices:
@@ -292,19 +260,29 @@ class USBDeviceMonitor:
             # Track system UID
             self.previous_system_uids.add(full_system_uid)
 
-        logger.info("Currently connected devices: %d", len(initial_devices))
-        for dev in initial_devices:
-            manufacturer = dev.get("vendor_name", "Unknown")
-            product = dev.get("device_name", "Unknown")
             logger.info(
                 "  - %s %s ('%s')",
-                manufacturer,
-                product,
+                dev.get("vendor_name", "Unknown"),
+                dev.get("device_name", "Unknown"),
                 dev["full_system_uid"],
             )
 
+    async def run(self, callback: Callable[[str, dict], Awaitable[None]] | None = None):
+        """
+        Monitor USB devices for changes (async)
+
+        Args:
+            callback: Optional async function to call when devices change.
+                     Receives (event_type, device_info) where event_type is
+                     'connected' or 'disconnected'
+        """
+
+        self._callback = callback
+
+        await self.init_tracking()
+
         try:
-            while self._monitoring:
+            while not self._shutdown_event.is_set():
                 # Get current devices
                 current_devices_list = await self.get_current_devices()
                 current_system_uids = {
@@ -329,7 +307,10 @@ class USBDeviceMonitor:
                 # Update tracking set
                 self.previous_system_uids = current_system_uids
 
-                await asyncio.sleep(self.poll_interval)
+                # Wait for the loop interval or shutdown signal
+                shutdown_signaled = await self.wait_or_timeout(self._loop_interval)
+                if shutdown_signaled:
+                    break
 
         except asyncio.CancelledError:
             logger.info("Monitoring cancelled")
@@ -341,11 +322,23 @@ class USBDeviceMonitor:
         self, callback: Callable[[str, dict], Awaitable[None]] | None = None
     ):
         """Alias for monitor() to start monitoring"""
-        await self.monitor(callback)
+        await self.run(callback)
 
-    def stop(self):
-        """Stop monitoring"""
-        self._monitoring = False
+    async def stop(self):
+        """Trigger shutdown."""
+        self._shutdown_event.set()
+
+    async def wait_or_timeout(self, timeout: float):  # noqa: ASYNC109
+        """Wait for shutdown event or timeout."""
+        try:
+            await asyncio.wait_for(self._shutdown_event.wait(), timeout)
+            return True
+        except TimeoutError:
+            return False
+
+    # -------------------------------------------------------------------------
+    # Utility methods
+    # -------------------------------------------------------------------------
 
     def get_all_devices(self) -> dict[str, dict[str, any]]:
         """Get all device instances that have been seen by the monitor."""
@@ -370,12 +363,6 @@ class USBDeviceMonitor:
     def get_devices_by_type(self, simple_uid: str) -> list[dict[str, any]]:
         """
         Get all instances (connected and disconnected) of a specific device type.
-
-        Args:
-            simple_uid: Device type identifier (e.g., "076b_5022")
-
-        Returns:
-            List of device info dicts for all instances of this type
         """
         if simple_uid not in self.devices_by_type:
             return []
@@ -389,44 +376,20 @@ class USBDeviceMonitor:
     def get_connected_devices_by_type(self, simple_uid: str) -> list[dict[str, any]]:
         """
         Get all currently connected instances of a specific device type.
-
-        Args:
-            simple_uid: Device type identifier (e.g., "076b_5022")
-
-        Returns:
-            List of device info dicts for connected instances of this type
         """
         devices = self.get_devices_by_type(simple_uid)
         return [dev for dev in devices if dev.get("is_connected", False)]
 
     def get_device_by_full_uid(self, full_system_uid: str) -> dict[str, any] | None:
-        """
-        Get a specific device instance by its full system UID.
-
-        Args:
-            full_system_uid: Full system identifier (e.g., "076b:5022:sn_ABC123")
-
-        Returns:
-            Device info dict or None if not found
-        """
+        """Get a specific device instance by its full system UID."""
         return self.device_registry.get(full_system_uid)
 
     def get_device_types(self) -> list[str]:
-        """
-        Get list of all device types (simple UIDs) that have been seen.
-
-        Returns:
-            List of simple UIDs
-        """
+        """Get list of all device types (simple UIDs) that have been seen."""
         return list(self.devices_by_type.keys())
 
     def get_device_type_summary(self) -> dict[str, dict[str, any]]:
-        """
-        Get summary of all device types with connection counts.
-
-        Returns:
-            Dict mapping simple_uid to summary info including counts
-        """
+        """Get summary of all device types with connection counts."""
         summary = {}
         for simple_uid, full_uids in self.devices_by_type.items():
             # Get one device instance for name/vendor info

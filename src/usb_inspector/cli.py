@@ -74,7 +74,7 @@ def monitor():
 
         # Start monitoring
         click.secho("Starting USB device monitor. Press Ctrl+X to stop.", fg="green")
-        await monitor.monitor(callback)
+        await monitor.run(callback)
 
     def stop_monitor():
         click.secho("\nStopping USB device monitor...", fg="red")
