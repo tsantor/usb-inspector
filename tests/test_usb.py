@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -74,18 +75,20 @@ async def test_get_current_devices(mock_find, monitor, usb_device):
     assert devices[0]["device_id"] == "5678"
 
 
-# @patch("usb.core.find")
-# @pytest.mark.asyncio
-# async def test_handle_new_devices(mock_find, monitor, usb_device):
-#     """Test the _handle_new_devices method."""
-#     mock_find.return_value = [usb_device]
+@patch("usb.core.find")
+@pytest.mark.asyncio
+async def test_handle_new_devices(mock_find, monitor, usb_device):
+    """Test the _handle_new_devices method."""
+    mock_find.return_value = [usb_device]
 
-#     new_devices = [monitor.get_device_info(usb_device)]
-#     await monitor._handle_new_devices(new_devices)  # noqa: SLF001
+    # Simulate adding a device
+    await monitor._handle_new_devices([usb_device])  # noqa: SLF001
 
-#     assert usb_device.serial_number in monitor.device_registry
-#     device_info = monitor.device_registry[usb_device.serial_number]
-#     assert device_info["is_connected"] is True
+    device_info = monitor.get_device_info(usb_device)
+    assert device_info["is_connected"] is True
+
+    # Test reconnecting the same device
+    await monitor._handle_new_devices([usb_device])  # noqa: SLF001
 
 
 @patch("usb.core.find")
@@ -156,6 +159,17 @@ def test_get_devices_by_type(monitor, usb_device):
     assert devices[0]["vendor_id"] == "1234"
 
 
+def test_get_connected_devices_by_type(monitor, usb_device):
+    """Test the get_connected_devices_by_type method."""
+    device_info = monitor.get_device_info(usb_device)
+    monitor.device_registry[device_info["full_system_uid"]] = device_info
+    monitor.devices_by_type[device_info["uid"]] = {device_info["full_system_uid"]}
+
+    devices = monitor.get_connected_devices_by_type(device_info["uid"])
+    assert len(devices) == 1
+    assert devices[0]["vendor_id"] == "1234"
+
+
 def test_get_device_by_full_uid(monitor, usb_device):
     """Test the get_device_by_full_uid method."""
     device_info = monitor.get_device_info(usb_device)
@@ -164,6 +178,37 @@ def test_get_device_by_full_uid(monitor, usb_device):
     device = monitor.get_device_by_full_uid(device_info["full_system_uid"])
     assert device["vendor_id"] == "1234"
     assert device["device_id"] == "5678"
+
+
+def test_get_all_devices(monitor, usb_device):
+    """Test the get_all_devices method."""
+    device_info = monitor.get_device_info(usb_device)
+    monitor.device_registry[device_info["full_system_uid"]] = device_info
+
+    all_devices = monitor.get_all_devices()
+    assert isinstance(all_devices, dict)
+    assert len(all_devices) == 1
+
+
+def test_get_device_types(monitor, usb_device):
+    """Test the get_device_types method."""
+    device_info = monitor.get_device_info(usb_device)
+    monitor.device_registry[device_info["full_system_uid"]] = device_info
+    monitor.devices_by_type[device_info["uid"]] = {device_info["full_system_uid"]}
+
+    device_types = monitor.get_device_types()
+    assert isinstance(device_types, list)
+    assert device_info["uid"] in device_types
+
+
+def test_get_device_type_summary(monitor, usb_device):
+    """Test the get_device_type_summary method."""
+    device_info = monitor.get_device_info(usb_device)
+    monitor.device_registry[device_info["full_system_uid"]] = device_info
+    monitor.devices_by_type[device_info["uid"]] = {device_info["full_system_uid"]}
+
+    device_type_summary = monitor.get_device_type_summary()
+    assert isinstance(device_type_summary, dict)
 
 
 @pytest.mark.asyncio

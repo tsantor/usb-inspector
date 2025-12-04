@@ -48,7 +48,7 @@ class USBDeviceMonitor:
         try:
             serial = device.serial_number
             if serial:
-                return f"{vendor_device}:sn_{serial}"
+                return f"{vendor_device}:{serial}"
         except (ValueError, usb.core.USBError, NotImplementedError):
             pass
 
@@ -58,7 +58,7 @@ class USBDeviceMonitor:
             return f"{vendor_device}:bus{device.bus}:port{port_path}"
 
         # Fall back to bus:address (may change on reconnect)
-        return f"{vendor_device}:{device.bus}:{device.address}"
+        return f"{vendor_device}:bus{device.bus}:address{device.address}"
 
     def get_port_path(self, device) -> str | None:
         """
@@ -68,11 +68,9 @@ class USBDeviceMonitor:
         try:
             # port_numbers is a tuple representing the physical USB port path
             # e.g., (1, 2) means hub port 1, then port 2
-            if hasattr(device, "port_numbers") and device.port_numbers:
-                return ".".join(str(p) for p in device.port_numbers)
+            return ".".join(str(p) for p in device.port_numbers)
         except (AttributeError, ValueError, usb.core.USBError):  # pragma: no cover
-            pass
-        return None
+            return None
 
     def get_device_info(self, device) -> dict[str, any]:
         """Extract detailed information from a USB device"""
@@ -161,7 +159,7 @@ class USBDeviceMonitor:
                 old_dev["address"] = dev["address"]
                 old_dev["is_connected"] = True
                 old_dev["last_seen"] = timestamp
-                dev = old_dev  # Use the existing device record
+                dev = old_dev  # noqa: PLW2901
             else:
                 # Brand new device
                 dev["is_connected"] = True
@@ -364,9 +362,6 @@ class USBDeviceMonitor:
         """
         Get all instances (connected and disconnected) of a specific device type.
         """
-        if simple_uid not in self.devices_by_type:
-            return []
-
         return [
             self.device_registry[full_uid]
             for full_uid in self.devices_by_type[simple_uid]

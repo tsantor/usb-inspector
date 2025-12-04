@@ -22,11 +22,11 @@ data_dir = Path(
 usb_db = data_dir / "usb_data.db"
 # click.echo(f"Using USB database at: {usb_db}")
 
-if not usb_db.exists():
+if not usb_db.exists():  # pragma: no cover
     # If the database does not exist, create it by updating from usb.ids
     from usb_inspector.update import update_usb_db
 
     update_usb_db()
 
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"

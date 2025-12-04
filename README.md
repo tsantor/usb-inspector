@@ -1,6 +1,6 @@
 # USB Inspector
 
-![Coverage](https://img.shields.io/badge/coverage-62%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)
 
 ## Overview
 
@@ -16,9 +16,6 @@ python3 -m pip install usb-inspector
 ```
 
 **IMPORTANT**: On Windows ensure you have `libusb-1.0.dll` (64bit) in `C:\Windows\System32` or you will get a `NoBackendError`. You can get it from [here](https://libusb.info/).
-
-### Raspberry Pi
-- Raspberry Pi 3B+ trixie aarch64 64bit
 
 ## Example Usage
 
