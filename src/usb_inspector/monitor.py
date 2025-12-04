@@ -68,7 +68,8 @@ class USBDeviceMonitor:
         try:
             # port_numbers is a tuple representing the physical USB port path
             # e.g., (1, 2) means hub port 1, then port 2
-            return ".".join(str(p) for p in device.port_numbers)
+            if device.port_numbers:
+                return ".".join(str(p) for p in device.port_numbers)
         except (AttributeError, ValueError, usb.core.USBError):  # pragma: no cover
             return None
 
