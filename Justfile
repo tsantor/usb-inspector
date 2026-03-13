@@ -1,4 +1,5 @@
 set shell := ["bash", "-cu"]
+# set shell := ["powershell.exe", "-NoLogo", "-Command"]
 
 # -----------------------------------------------------------------------------
 # Variables
