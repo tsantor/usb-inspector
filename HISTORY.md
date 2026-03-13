@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.3.0 (2026-03-13)
+- CHANGED refactored package internals to a layered DDD structure under `usb_inspector.usb` (domain/application/infrastructure/interface).
+- CHANGED internal legacy modules `db.py`, `update.py`, and `cli.py` were removed; CLI entry point now resolves to `usb_inspector.usb.interface.router:cli`.
+- CHANGED `usb_inspector.monitor` remains available as a compatibility shim for `USBDeviceMonitor`.
+- FIXED circular import issues in package initialization/import flow.
+- ADDED layered test coverage for application and infrastructure modules plus import regression coverage.
+
 ## 0.2.2 (2025-12-04)
 - ADDED tox and more test coverage
 

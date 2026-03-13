@@ -30,13 +30,18 @@ usb-inspector update-db
 ```
 
 ```python
+import asyncio
+
 from usb_inspector.monitor import USBDeviceMonitor
 
-usb_monitor = USBDeviceMonitor(poll_interval=1.0)
-usb_monitor.monitor()
-# Do stuff
-...
-usb_monitor.stop()
+async def main():
+    usb_monitor = USBDeviceMonitor(poll_interval=1.0)
+    monitor_task = asyncio.create_task(usb_monitor.run())  # or usb_monitor.start()
+    await asyncio.sleep(10)
+    await usb_monitor.stop()
+    await monitor_task
+
+asyncio.run(main())
 ```
 
 ## Issues
@@ -46,17 +51,17 @@ If you experience any issues, please create an [issue](https://bitbucket.org/xst
 
 ## Development
 
-To get a list of all commands with descriptions simply run `make`.
+To get a list of all commands with descriptions simply run `just`.
 
 ```bash
-make env
-make pip_install_editable
+just env
+just pip-install-editable
 ```
 
 ## Testing
 
 ```bash
-make pytest
-make coverage
-make open_coverage
+just pytest
+just coverage
+just open-coverage
 ```
