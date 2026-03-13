@@ -1,0 +1,49 @@
+image: python:3.13
+
+options:
+  max-time: 30
+
+pipelines:
+  pull-requests:
+    '**':
+      - step:
+          name: Quality Gates
+          caches:
+            - pip
+          script:
+            - pip install uv
+            - uv sync --no-default-groups --group dev --group test
+            - just ci
+
+  branches:
+    master:
+      - step:
+          name: Quality Gates
+          caches:
+            - pip
+          script:
+            - pip install uv
+            - uv sync --no-default-groups --group dev --group test
+            - just ci
+    main:
+      - step:
+          name: Quality Gates
+          caches:
+            - pip
+          script:
+            - pip install uv
+            - uv sync --no-default-groups --group dev --group test
+            - just ci
+
+  tags:
+    'v*':
+      - step:
+          name: Release Gates + Build
+          caches:
+            - pip
+          script:
+            - pip install uv
+            - uv sync --no-default-groups --group dev --group test
+            - just ci
+          artifacts:
+            - dist/**

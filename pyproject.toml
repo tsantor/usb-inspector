@@ -79,7 +79,6 @@ pythonpath = "src"
 
 # ==== Coverage ====
 [tool.coverage.run]
-include = ["*/usb_inspector/**/*.py"]
 omit = ["*/migrations/*", "*/tests/*"]
 # plugins = []
 
