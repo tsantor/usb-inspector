@@ -1,8 +1,8 @@
 from unittest.mock import patch
 
-from usb_inspector.db import delete_data_file
-from usb_inspector.db import delete_usb_db
-from usb_inspector.db import lookup_usb_details
+from usb_inspector.usb.infrastructure.repository import delete_data_file
+from usb_inspector.usb.infrastructure.repository import delete_usb_db
+from usb_inspector.usb.infrastructure.repository import lookup_usb_details
 
 
 def test_delete_usb_db(tmp_path):
@@ -10,8 +10,8 @@ def test_delete_usb_db(tmp_path):
     db_file = tmp_path / "usb_inspector.db"
     db_file.touch()
 
-    # Patch the usb_db variable in the usb_inspector.db module
-    with patch("usb_inspector.db.usb_db", str(db_file)):
+    # Patch the usb_db variable in the infrastructure module
+    with patch("usb_inspector.usb.infrastructure.repository.usb_db", str(db_file)):
         assert db_file.exists()
         delete_usb_db()
         assert not db_file.exists()
@@ -22,8 +22,8 @@ def test_delete_data_file(tmp_path):
     data_file = tmp_path / "usb.ids"
     data_file.touch()
 
-    # Patch the data_file variable in the usb_inspector.db module
-    with patch("usb_inspector.db.data_file", str(data_file)):
+    # Patch the data_file variable in the infrastructure module
+    with patch("usb_inspector.usb.infrastructure.repository.data_file", str(data_file)):
         assert data_file.exists()
         delete_data_file()
         assert not data_file.exists()

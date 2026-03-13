@@ -1,6 +1,6 @@
 # USB Inspector
 
-![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-50.19%25-orange)
 
 ## Overview
 

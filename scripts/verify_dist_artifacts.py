@@ -7,6 +7,7 @@ from usb_inspector import __all__ as exported_symbols
 from usb_inspector import __version__
 
 DIST_DIR = Path("dist")
+PACKAGE_NAME = "usb-inspector"
 PACKAGE_DIR = "usb_inspector"
 
 
@@ -28,7 +29,7 @@ def _verify_wheel(wheel_path: Path) -> None:
         ).rsplit("/", maxsplit=1)[0]
         metadata_name = f"{dist_info_dir}/METADATA"
         metadata = message_from_string(wheel.read(metadata_name).decode("utf-8"))
-        assert metadata["Name"] == "config-inspector"
+        assert metadata["Name"] == PACKAGE_NAME
         assert metadata["Version"] == __version__
 
         exported_count = sum(
@@ -42,7 +43,7 @@ def _verify_wheel(wheel_path: Path) -> None:
 def _verify_sdist(sdist_path: Path) -> None:
     with tarfile.open(sdist_path, "r:gz") as sdist:
         names = set(sdist.getnames())
-        assert any(name.endswith("src/usb_inspector/__init__.py") for name in names)
+        assert any(name.endswith(f"src/{PACKAGE_DIR}/__init__.py") for name in names)
         assert any(name.endswith("pyproject.toml") for name in names)
 
 

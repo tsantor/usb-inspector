@@ -12,6 +12,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+PACKAGE_DIR = "usb_inspector"
+
 
 def run(cmd: list[str]) -> None:
     # Commands are constructed internally and not user supplied.
@@ -68,7 +70,7 @@ def main() -> int:
         [
             str(python_bin),
             "-c",
-            "import usb_inspector; print(usb_inspector.__version__)",
+            f"import {PACKAGE_DIR}; print({PACKAGE_DIR}.__version__)",
         ]
     )
     logger.info("Wheel smoke test passed: %s", wheel.name)

@@ -1,0 +1,8 @@
+{
+  "modules": {
+    "usb_inspector": [
+      "USBDeviceMonitor"
+    ]
+  },
+  "schema_version": 2
+}

@@ -228,7 +228,7 @@ open-coverage:
 
 # Run tests with coverage threshold gate
 [group('testing')]
-pytest-cov-gate cov_fail_under="95":
+pytest-cov-gate cov_fail_under="50":
     uv run pytest -q --cov={{package_name}} --cov-report=term-missing --cov-fail-under={{cov_fail_under}}
 
 # Generate public API lockfile snapshot

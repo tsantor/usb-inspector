@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -55,7 +54,7 @@ def test_get_device_info(mock_find, monitor, usb_device):
     assert device_info["vendor_id"] == "1234"
     assert device_info["device_id"] == "5678"
     assert device_info["bus"] == 1
-    assert device_info["address"] == 2
+    assert device_info["address"] == 2  # noqa: PLR2004
     assert device_info["port"] == "1.2"
     assert device_info["vendor_name_short"] == "Test Manufacturer"
     assert device_info["device_name"] == "Test Product"

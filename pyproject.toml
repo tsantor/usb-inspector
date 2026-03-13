@@ -37,6 +37,7 @@ dev=[
   "pipdeptree>=2.29.0",
   "pre-commit>=4.3.0",
   "ruff>=0.14.2",
+  "setuptools>=82.0.1",
   "twine>=6.2.0",
   "wheel>=0.45.1",
 ]
@@ -62,7 +63,7 @@ Changelog = "https://bitbucket.org/xstudios/usb-inspector/blob/master/HISTORY.md
 where = ["src"]
 
 [project.scripts]
-usb-inspector = "usb_inspector.cli:cli"
+usb-inspector = "usb_inspector.usb.interface.router:cli"
 
 [tool.setuptools.dynamic]
 version = { attr = "usb_inspector.__version__" }
