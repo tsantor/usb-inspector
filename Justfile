@@ -203,17 +203,17 @@ pytest-verbose:
 # Run tests with coverage
 [group('testing')]
 coverage:
-    uv run coverage run -m pytest && uv run coverage html
+    uv run pytest -q --cov={{package_name}} --cov-report=term-missing --cov-report=html
 
 # Run tests with coverage in verbose mode
 [group('testing')]
 coverage-verbose:
-    uv run coverage run -m pytest -vss && uv run coverage html
+    uv run pytest -vss --cov={{package_name}} --cov-report=term-missing --cov-report=html
 
 # Run tests with coverage and skip covered
 [group('testing')]
 coverage-skip:
-    uv run coverage run -m pytest -vs && uv run coverage html --skip-covered
+    uv run pytest -vs --cov={{package_name}} --cov-report=term-missing:skip-covered --cov-report=html
 
 # Update README coverage badge from current test coverage
 [group('testing')]
