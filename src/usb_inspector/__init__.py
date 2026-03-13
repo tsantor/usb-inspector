@@ -1,26 +1,12 @@
 import logging
-from importlib import resources
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-import platformdirs
+from .data_utils import data_file
+from .paths import usb_db
 
 # Basic logger setup; users of this package can configure logging as needed
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
-
-
-data_file = resources.files("usb_inspector.data") / "usb.ids"
-# usb_db = resources.files("usb_inspector.data") / "usb_data.db"
-
-data_dir = Path(
-    platformdirs.user_data_dir(
-        appname="usb-inspector",
-        appauthor="xstudios",
-        ensure_exists=True,
-    )
-)
-usb_db = data_dir / "usb_data.db"
-# click.echo(f"Using USB database at: {usb_db}")
 
 if not usb_db.exists():  # pragma: no cover
     # If the database does not exist, create it by updating from usb.ids
@@ -28,5 +14,18 @@ if not usb_db.exists():  # pragma: no cover
 
     update_usb_db()
 
+if TYPE_CHECKING:
+    from .monitor import USBDeviceMonitor
+
+
+def __getattr__(name: str):
+    if name == "USBDeviceMonitor":
+        from .monitor import USBDeviceMonitor
+
+        return USBDeviceMonitor
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __version__ = "0.2.2"
+
+__all__ = ["USBDeviceMonitor"]

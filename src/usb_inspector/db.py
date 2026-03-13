@@ -2,8 +2,8 @@ import logging
 import sqlite3
 from pathlib import Path
 
-from usb_inspector import data_file
-from usb_inspector import usb_db
+from usb_inspector.data_utils import data_file
+from usb_inspector.paths import usb_db
 
 logger = logging.getLogger(__name__)
 
