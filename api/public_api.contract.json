@@ -2,6 +2,9 @@
   "modules": {
     "usb_inspector": [
       "USBDeviceMonitor"
+    ],
+    "usb_inspector.monitor": [
+      "USBDeviceMonitor"
     ]
   }
 }

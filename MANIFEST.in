@@ -1,6 +1,0 @@
-include AUTHORS.md
-include HISTORY.md
-include LICENSE
-include README.md
-
-recursive-include src/usb_inspector/data/ *.ids

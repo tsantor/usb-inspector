@@ -1,49 +1,41 @@
 image: python:3.13
 
-options:
-  max-time: 30
+definitions:
+  steps:
+    - step: &quality-gate-logic
+        name: Quality Gates
+        caches:
+          - pip
+        script:
+          # 1. Install uv standalone
+          - curl -LsSf https://astral.sh/uv/install.sh | sh
+          - export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+
+          # 2. Install the REAL 'just' binary (not the python package)
+          - curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
+          - mkdir -p dist
+
+          # 3. Project Setup & Execution
+          - uv sync --no-default-groups --group dev --group test
+          - just dist
+          - just release-check
 
 pipelines:
   pull-requests:
     '**':
-      - step:
-          name: Quality Gates
-          caches:
-            - pip
-          script:
-            - pip install uv
-            - uv sync --no-default-groups --group dev --group test
-            - just ci
+      - step: *quality-gate-logic
 
   branches:
     master:
-      - step:
-          name: Quality Gates
-          caches:
-            - pip
-          script:
-            - pip install uv
-            - uv sync --no-default-groups --group dev --group test
-            - just ci
+      - step: *quality-gate-logic
     main:
-      - step:
-          name: Quality Gates
-          caches:
-            - pip
-          script:
-            - pip install uv
-            - uv sync --no-default-groups --group dev --group test
-            - just ci
+      - step: *quality-gate-logic
 
   tags:
     'v*':
       - step:
+          <<: *quality-gate-logic
           name: Release Gates + Build
-          caches:
-            - pip
-          script:
-            - pip install uv
-            - uv sync --no-default-groups --group dev --group test
-            - just ci
           artifacts:
             - dist/**

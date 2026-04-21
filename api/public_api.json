@@ -2,7 +2,9 @@
   "modules": {
     "usb_inspector": [
       "USBDeviceMonitor"
+    ],
+    "usb_inspector.monitor": [
+      "USBDeviceMonitor"
     ]
-  },
-  "schema_version": 2
+  }
 }
