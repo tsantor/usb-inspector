@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.3.1 (2026-04-21)
+- CHANGED updated build backend and release tooling configuration.
+- CHANGED refreshed Justfile workflows for environment, testing, and release checks.
+- CHANGED updated packaging/verification helper scripts and dependency lock maintenance.
+- CHANGED updated pre-commit toolchain versions.
+
 ## 0.3.0 (2026-03-13)
 - CHANGED refactored package internals to a layered DDD structure under `usb_inspector.usb` (domain/application/infrastructure/interface).
 - CHANGED internal legacy modules `db.py`, `update.py`, and `cli.py` were removed; CLI entry point now resolves to `usb_inspector.usb.interface.router:cli`.
