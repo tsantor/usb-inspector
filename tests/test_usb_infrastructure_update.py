@@ -1,10 +1,13 @@
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
-from usb_inspector.usb.infrastructure.repository import USBDatabaseMaintenanceRepository
 import usb_inspector.usb.infrastructure.repository as repository_module
+from usb_inspector.usb.infrastructure.repository import USBDatabaseMaintenanceRepository
+
+EXPECTED_VENDORS = 2
+EXPECTED_DEVICES = 2
+REQUEST_TIMEOUT_SECONDS = 5
+NETWORK_DOWN_ERROR = "network down"
 
 
 @pytest.fixture
@@ -86,8 +89,8 @@ def test_update_existing_database_inserts_only_new_rows(maintenance_repo):
     devices = pd.read_sql("SELECT * FROM devices", conn)
     conn.close()
 
-    assert len(vendors) == 2
-    assert len(devices) == 2
+    assert len(vendors) == EXPECTED_VENDORS
+    assert len(devices) == EXPECTED_DEVICES
 
 
 class _FakeResponse:
@@ -103,7 +106,7 @@ def test_update_usb_db_download_and_persist_success(maintenance_repo, monkeypatc
     sample_usb_ids = b"1A40  Terminus Technology Inc.\n\t0801  USB 2.0 Hub\n"
 
     def _fake_get(_url, timeout):
-        assert timeout == 5
+        assert timeout == REQUEST_TIMEOUT_SECONDS
         return _FakeResponse(sample_usb_ids)
 
     monkeypatch.setattr(repository_module.requests, "get", _fake_get)
@@ -119,7 +122,8 @@ def test_update_usb_db_returns_false_on_download_error(maintenance_repo, monkeyp
     repo, _, _ = maintenance_repo
 
     def _raise_request_error(_url, timeout):
-        raise repository_module.requests.exceptions.RequestException("network down")
+        msg = NETWORK_DOWN_ERROR
+        raise repository_module.requests.exceptions.RequestException(msg)
 
     monkeypatch.setattr(repository_module.requests, "get", _raise_request_error)
 

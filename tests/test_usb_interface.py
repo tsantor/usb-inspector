@@ -5,10 +5,10 @@ from unittest.mock import MagicMock
 from click.testing import CliRunner
 
 import usb_inspector.usb.interface.dependencies as deps
-import usb_inspector.usb.interface.router as router
 from usb_inspector.usb.application.service import USBMonitoringService
 from usb_inspector.usb.infrastructure.repository import SQLiteUSBDetailsRepository
 from usb_inspector.usb.infrastructure.repository import USBDatabaseMaintenanceRepository
+from usb_inspector.usb.interface import router
 
 
 class _FakeLoop:

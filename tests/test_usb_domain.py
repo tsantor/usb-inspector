@@ -10,6 +10,9 @@ from usb_inspector.usb.domain.value_objects import PortPath
 from usb_inspector.usb.domain.value_objects import SimpleUid
 from usb_inspector.usb.domain.value_objects import VendorId
 
+CONNECTED_BUS = 3
+CONNECTED_ADDRESS = 4
+
 
 def test_vendor_id_normalizes_uppercase_hex():
     vendor = VendorId("1A40")
@@ -36,7 +39,7 @@ def test_vendor_id_rejects_wrong_length():
 
 
 def test_device_id_rejects_non_hex():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid literal for int\\(\\) with base 16"):
         DeviceId("zzzz")
 
 
@@ -59,11 +62,15 @@ def test_usb_device_snapshot_state_transitions():
         last_seen="2026-03-13T00:00:00+00:00",
     )
 
-    snapshot.mark_connected("2026-03-13T00:00:10+00:00", bus=3, address=4)
+    snapshot.mark_connected(
+        "2026-03-13T00:00:10+00:00",
+        bus=CONNECTED_BUS,
+        address=CONNECTED_ADDRESS,
+    )
     assert snapshot.is_connected is True
     assert snapshot.last_seen == "2026-03-13T00:00:10+00:00"
-    assert snapshot.bus == 3
-    assert snapshot.address == 4
+    assert snapshot.bus == CONNECTED_BUS
+    assert snapshot.address == CONNECTED_ADDRESS
 
     snapshot.mark_disconnected("2026-03-13T00:00:20+00:00")
     assert snapshot.is_connected is False
