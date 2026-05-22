@@ -37,6 +37,15 @@ repos:
       # Formatter
       - id: ruff-format
 
+  - repo: local
+    hooks:
+      - id: just-fmt
+        name: just fmt
+        language: system
+        entry: sh -c 'for file in "$@"; do just --unstable --fmt --justfile "$file"; done' --
+        pass_filenames: true
+        files: (?i)(^|/)justfile$
+
 # sets up .pre-commit-ci.yaml to ensure pre-commit dependencies stay up to date
 ci:
   autoupdate_schedule: weekly

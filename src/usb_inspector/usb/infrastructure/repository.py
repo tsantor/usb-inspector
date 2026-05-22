@@ -23,6 +23,9 @@ class PyUSBEnumerator:
 
 class SQLiteUSBDetailsRepository:
     def lookup(self, vendor_id, device_id=None) -> dict | None:
+        if not usb_db.exists():
+            USBDatabaseMaintenanceRepository().update_usb_db()
+
         vendor_id = normalize_vendor_id(vendor_id)
         device_id = normalize_device_id(device_id)
 
@@ -210,18 +213,3 @@ class USBDatabaseMaintenanceRepository:
         self.update_existing_database(vendors_df, devices_df)
         return True
 
-
-def lookup_usb_details(vendor_id, device_id=None) -> dict | None:
-    return SQLiteUSBDetailsRepository().lookup(vendor_id, device_id)
-
-
-def delete_usb_db() -> None:
-    USBDatabaseMaintenanceRepository().delete_usb_db()
-
-
-def delete_data_file() -> None:
-    USBDatabaseMaintenanceRepository().delete_data_file()
-
-
-def update_usb_db() -> bool:
-    return USBDatabaseMaintenanceRepository().update_usb_db()

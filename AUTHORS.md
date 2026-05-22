@@ -1,6 +1,6 @@
 # Authors
 
-Host Info is written and maintained by Tim Santor and various contributors:
+Written and maintained by Tim Santor and various contributors:
 
 ## Development Lead
 

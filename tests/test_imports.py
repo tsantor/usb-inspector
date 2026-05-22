@@ -1,22 +1,27 @@
-def test_package_import_exposes_usb_device_monitor():
+import importlib
+
+import pytest
+
+
+def test_package_exposes_application_service():
     import usb_inspector  # noqa: PLC0415
 
-    assert usb_inspector.USBDeviceMonitor is not None
+    assert usb_inspector.USBMonitoringService is not None
 
 
-def test_legacy_monitor_import_emits_warning():
-    import importlib  # noqa: PLC0415
-    import sys  # noqa: PLC0415
-    import warnings  # noqa: PLC0415
+def test_package_exposes_ports():
+    import usb_inspector  # noqa: PLC0415
 
-    from usb_inspector._compat_warnings import LegacyImportWarning  # noqa: PLC0415
+    assert usb_inspector.USBEnumeratorPort is not None
+    assert usb_inspector.USBDetailsLookupPort is not None
 
-    sys.modules.pop("usb_inspector.monitor", None)
 
-    with warnings.catch_warnings(record=True) as records:
-        warnings.simplefilter("always")
+def test_package_exposes_factory():
+    import usb_inspector  # noqa: PLC0415
+
+    assert usb_inspector.create_usb_monitoring_service is not None
+
+
+def test_legacy_monitor_import_is_removed():
+    with pytest.raises(ModuleNotFoundError):
         importlib.import_module("usb_inspector.monitor")
-
-    assert any(
-        isinstance(record.message, LegacyImportWarning) for record in records
-    )

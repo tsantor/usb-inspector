@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.0.0 (2026-05-22)
+
+**Breaking changes**
+
+- REMOVED `USBDeviceMonitor` from the public API. Use `create_usb_monitoring_service()` instead, which returns a `USBMonitoringService` instance with the same behaviour.
+- REMOVED standalone free functions `lookup_usb_details`, `delete_usb_db`, `delete_data_file`, and `update_usb_db` from `usb_inspector.usb.infrastructure.repository`. Use `SQLiteUSBDetailsRepository` and `USBDatabaseMaintenanceRepository` directly.
+- CHANGED public API of `usb_inspector` package now exports `USBMonitoringService`, `USBEnumeratorPort`, `USBDetailsLookupPort`, and `create_usb_monitoring_service`. Importing `USBDeviceMonitor` from the top-level package will raise `ImportError`.
+
+**Other changes**
+
+- CHANGED package no longer initialises the USB database on import. Initialisation is now lazy: the database is created on the first call to `SQLiteUSBDetailsRepository.lookup()` if it does not already exist.
+- CHANGED `usb_inspector.usb` package no longer re-exports `USBMonitoringService`; import from `usb_inspector` or `usb_inspector.usb.application.service` directly.
+- CHANGED `usb_inspector.usb.infrastructure` package now exports only `create_usb_monitoring_service`; concrete repository classes remain importable from their module.
+
 ## 0.3.1 (2026-04-21)
 - CHANGED updated build backend and release tooling configuration.
 - CHANGED refreshed Justfile workflows for environment, testing, and release checks.

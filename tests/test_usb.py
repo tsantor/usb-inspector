@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from usb_inspector.monitor import USBDeviceMonitor
+from usb_inspector.usb.infrastructure.factory import create_usb_monitoring_service
 
 
 @pytest.fixture
@@ -40,8 +40,8 @@ def usb_device2():
 
 @pytest.fixture
 def monitor():
-    """Fixture to create a USBDeviceMonitor instance."""
-    return USBDeviceMonitor(poll_interval=1)
+    """Fixture to create a USBMonitoringService instance."""
+    return create_usb_monitoring_service(poll_interval=1)
 
 
 @patch("usb.core.find")
@@ -212,17 +212,10 @@ def test_get_device_type_summary(monitor, usb_device):
 
 @pytest.mark.asyncio
 async def test_get_current_devices_real():
-    """Test USBDeviceMonitor with real USB devices"""
-    # Create an instance of USBDeviceMonitor
-    monitor = USBDeviceMonitor(poll_interval=1.0)
-    # Get the current devices
-    current_devices = await monitor.get_current_devices()
-    # Ensure we get a list back
+    """Test USBMonitoringService with real USB devices"""
+    service = create_usb_monitoring_service(poll_interval=1.0)
+    current_devices = await service.get_current_devices()
     assert isinstance(current_devices, list), "Expected a list of devices"
-    # Log the devices for debugging
-    # for device in current_devices:
-    #     print(json.dumps(device, indent=2))
-    # Ensure each device in the list is a dictionary
     for device in current_devices:
         assert isinstance(device, dict), "Each device should be a dictionary"
         assert "vendor_id" in device, "Each device should have a 'vendor_id' key"

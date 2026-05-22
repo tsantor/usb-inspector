@@ -1,29 +1,16 @@
 import logging
-from typing import TYPE_CHECKING
 
-from .paths import usb_db
+from .usb.application.ports import USBDetailsLookupPort
+from .usb.application.ports import USBEnumeratorPort
+from .usb.application.service import USBMonitoringService
+from .usb.infrastructure.factory import create_usb_monitoring_service
 
-# Basic logger setup; users of this package can configure logging as needed
+__all__ = [
+    "USBDetailsLookupPort",
+    "USBEnumeratorPort",
+    "USBMonitoringService",
+    "create_usb_monitoring_service",
+]
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
-
-if not usb_db.exists():  # pragma: no cover
-    # If the database does not exist, create it by updating from usb.ids
-    from usb_inspector.usb.infrastructure.repository import update_usb_db
-
-    update_usb_db()
-
-if TYPE_CHECKING:
-    from .monitor import USBDeviceMonitor
-
-
-def __getattr__(name: str):
-    if name == "USBDeviceMonitor":
-        from .monitor import USBDeviceMonitor  # noqa: PLC0415
-
-        return USBDeviceMonitor
-    msg = f"module {__name__!r} has no attribute {name!r}"
-    raise AttributeError(msg)
-
-
-__all__ = ["USBDeviceMonitor"]

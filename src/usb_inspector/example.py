@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import logging
 
-from usb_inspector.monitor import USBDeviceMonitor
+from usb_inspector import create_usb_monitoring_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,8 +18,7 @@ async def custom_callback(event_type: str, device_info: dict):
     if event_type == "connected":
         product = device_info.get("product")
         logger.info("Custom handler: New device detected - %s", product)
-        # Can do async operations here
-        await asyncio.sleep(0.1)  # Simulating async work
+        await asyncio.sleep(0.1)
     else:
         logger.info("Custom handler: Device removed - %s", device_info["device_id"])
 
@@ -27,27 +26,23 @@ async def custom_callback(event_type: str, device_info: dict):
 async def main():
     """Example usage with asyncio"""
 
-    # Example 1: Basic monitoring
-    monitor = USBDeviceMonitor(poll_interval=1.0)
+    # Example 1: Basic monitoring (batteries-included factory)
+    service = create_usb_monitoring_service(poll_interval=1.0)
 
     # Example 2: With custom callback
-    await monitor.monitor(callback=custom_callback)
+    await service.run(callback=custom_callback)
 
     # Example 3: Just get current devices without monitoring
-    # devices = await monitor.get_current_devices()
+    # devices = await service.get_current_devices()
     # for dev in devices:
-    #     print(monitor.get_device_info(dev))
-    # print("Currently connected USB devices:")
+    #     print(dev)
+
     # Example 4: Run monitoring as a background task
-    monitor_task = asyncio.create_task(monitor.monitor())
+    monitor_task = asyncio.create_task(service.run())
 
     try:
-        # Do other async work here
         await asyncio.sleep(10)
-
-        # Wait for the monitor task to complete
         await monitor_task
-
     except asyncio.CancelledError:
         logger.info("Monitoring task was cancelled.")
     except KeyboardInterrupt:
@@ -62,7 +57,7 @@ async def main():
 async def example_with_multiple_tasks():
     """Example showing USB monitoring alongside other async tasks"""
 
-    monitor = USBDeviceMonitor(poll_interval=5.0)
+    service = create_usb_monitoring_service(poll_interval=5.0)
 
     async def some_other_task():
         """Simulate other async work"""
@@ -71,25 +66,18 @@ async def example_with_multiple_tasks():
             logger.info("Other task working... %d", i)
 
     try:
-        # Run both tasks concurrently
-        await asyncio.gather(
-            monitor.monitor(callback=custom_callback), some_other_task()
-        )
+        await asyncio.gather(service.run(callback=custom_callback), some_other_task())
     except asyncio.CancelledError:
         logger.info("Tasks were cancelled.")
     except KeyboardInterrupt:
         logger.info("Monitoring stopped by user.")
-        monitor.stop()  # Ensure the monitor stops gracefully
+        await service.stop()
     finally:
         logger.info("Exiting example_with_multiple_tasks.")
 
 
 if __name__ == "__main__":
     try:
-        # Run the async main function
         asyncio.run(main())
-
-        # Or use the multiple tasks example
-        # asyncio.run(example_with_multiple_tasks())
     except KeyboardInterrupt:
         logger.info("Program interrupted by user.")

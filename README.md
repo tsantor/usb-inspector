@@ -32,7 +32,7 @@ usb-inspector update-db
 ```python
 import asyncio
 
-from usb_inspector.monitor import USBDeviceMonitor
+from usb_inspector.usb.infrastructure.monitor import USBDeviceMonitor
 
 async def main():
     usb_monitor = USBDeviceMonitor(poll_interval=1.0)
