@@ -257,7 +257,7 @@ clean-all: clean clean-tests
 # Show src directory tree
 [group('misc')]
 tree:
-    tree src -I '__pycache__'
+    tree src -I '__pycache__|*.egg-info'
 
 # Show full directory tree
 [group('misc')]

@@ -5,9 +5,9 @@ import signal
 
 import click
 
-from usb_inspector.usb.interface.dependencies import get_details_repository
-from usb_inspector.usb.interface.dependencies import get_maintenance_repository
-from usb_inspector.usb.interface.dependencies import get_monitoring_service
+from usb_inspector.usb.infrastructure.factory import create_usb_monitoring_service
+from usb_inspector.usb.infrastructure.repository import SQLiteUSBDetailsRepository
+from usb_inspector.usb.infrastructure.repository import USBDatabaseMaintenanceRepository
 
 
 @click.group()
@@ -26,7 +26,7 @@ def cli():
     help="Device ID of the USB device (4-digit hex)",
 )
 def lookup(vendor_id, device_id):
-    details = get_details_repository().lookup(vendor_id, device_id)
+    details = SQLiteUSBDetailsRepository().lookup(vendor_id, device_id)
     if details:
         click.echo(json.dumps(details, indent=2))
     else:
@@ -38,19 +38,19 @@ def lookup(vendor_id, device_id):
 
 @cli.command()
 def update_db():
-    get_maintenance_repository().update_usb_db()
+    USBDatabaseMaintenanceRepository().update_usb_db()
     click.secho("✅ USB database updated successfully.", fg="green")
 
 
 @cli.command()
 def delete_db():
-    get_maintenance_repository().delete_usb_db()
+    USBDatabaseMaintenanceRepository().delete_usb_db()
     click.secho("✅ USB database deleted successfully.", fg="green")
 
 
 @cli.command()
 def delete_data():
-    get_maintenance_repository().delete_data_file()
+    USBDatabaseMaintenanceRepository().delete_data_file()
     click.secho("✅ Data file deleted successfully.", fg="green")
 
 
@@ -60,7 +60,7 @@ def monitor():
 
     async def run_monitor():
         nonlocal service
-        service = get_monitoring_service(poll_interval=1.0)
+        service = create_usb_monitoring_service(poll_interval=1.0)
 
         async def callback(event_type, device_info):
             click.secho(
