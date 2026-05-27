@@ -7,6 +7,7 @@ from typing import Any
 
 from usb_inspector.usb.application.ports import USBDetailsLookupPort
 from usb_inspector.usb.application.ports import USBEnumeratorPort
+from usb_inspector.usb.domain.entities import USBDeviceSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,9 @@ class USBMonitoringService:
         self._details_lookup = details_lookup
         self._shutdown_event = asyncio.Event()
         self._loop_interval = poll_interval
-        self.previous_system_uids = set()
-        self.device_registry = {}
-        self.devices_by_type = {}
+        self.previous_system_uids: set[str] = set()
+        self.device_registry: dict[str, USBDeviceSnapshot] = {}
+        self.devices_by_type: dict[str, set[str]] = {}
         self._callback = None
 
     def get_simple_uid(self, device) -> str:
@@ -58,103 +59,98 @@ class USBMonitoringService:
             return None
         return None
 
-    def get_device_info(self, device) -> dict[str, Any]:
+    def get_device_info(self, device) -> USBDeviceSnapshot:
         vendor_id_str = f"{device.idVendor:04x}"
         device_id_str = f"{device.idProduct:04x}"
         simple_uid = f"{vendor_id_str}_{device_id_str}"
         full_system_uid = self.get_full_system_uid(device)
         port_path = self.get_port_path(device)
-
         timestamp = datetime.now().astimezone().isoformat()
 
-        info = {
-            "device_id": device_id_str,
-            "vendor_id": vendor_id_str,
-            "version": getattr(device, "bcdDevice", None),
-            "bus": getattr(device, "bus", None),
-            "port": port_path,
-            "address": getattr(device, "address", None),
-            "uid": simple_uid,
-            "full_system_uid": full_system_uid,
-            "is_connected": True,
-            "last_seen": timestamp,
-        }
+        try:
+            vendor_name_short = device.manufacturer
+        except Exception:  # pragma: no cover  # noqa: BLE001
+            vendor_name_short = None
 
         try:
-            info["vendor_name_short"] = device.manufacturer
+            device_name = device.product
         except Exception:  # pragma: no cover  # noqa: BLE001
-            info["vendor_name_short"] = None
+            device_name = None
 
         try:
-            info["device_name"] = device.product
+            serial = device.serial_number
         except Exception:  # pragma: no cover  # noqa: BLE001
-            info["device_name"] = None
+            serial = None
 
-        try:
-            info["serial"] = device.serial_number
-        except Exception:  # pragma: no cover  # noqa: BLE001
-            info["serial"] = None
-
-        cache_key = f"{info['vendor_id']}:{info['device_id']}"
+        cache_key = f"{vendor_id_str}:{device_id_str}"
         if cache_key not in self.usb_details_cache:
-            details = self._details_lookup.lookup(info["vendor_id"], info["device_id"])
+            details = self._details_lookup.lookup(vendor_id_str, device_id_str)
             self.usb_details_cache[cache_key] = details
         else:
             details = self.usb_details_cache[cache_key]
 
+        vendor_name = "Unknown"
         if details:
-            info["vendor_name"] = details.get("vendor_name", "Unknown")
-            if info["device_name"] is None:
-                info["device_name"] = details.get("device_name", "Unknown")
-        else:
-            info["vendor_name"] = "Unknown"
+            vendor_name = details.get("vendor_name", "Unknown")
+            if device_name is None:
+                device_name = details.get("device_name", "Unknown")
 
-        if info["vendor_name_short"]:
-            info["vendor_name"] += f" ({info['vendor_name_short']})"
+        if vendor_name_short:
+            vendor_name += f" ({vendor_name_short})"
 
-        return dict(sorted(info.items()))
+        return USBDeviceSnapshot(
+            vendor_id=vendor_id_str,
+            device_id=device_id_str,
+            version=getattr(device, "bcdDevice", None),
+            bus=getattr(device, "bus", None),
+            address=getattr(device, "address", None),
+            uid=simple_uid,
+            full_system_uid=full_system_uid,
+            is_connected=True,
+            last_seen=timestamp,
+            port=port_path,
+            vendor_name=vendor_name,
+            vendor_name_short=vendor_name_short,
+            device_name=device_name,
+            serial=serial,
+        )
 
-    async def get_current_devices(self) -> list[dict[str, Any]]:
+    async def get_current_devices(self) -> list[USBDeviceSnapshot]:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_devices_sync)
 
-    def _get_devices_sync(self) -> list[dict[str, Any]]:
+    def _get_devices_sync(self) -> list[USBDeviceSnapshot]:
         return [
             self.get_device_info(device) for device in self._enumerator.iter_devices()
         ]
 
-    async def _handle_new_devices(self, new_devices: list[dict[str, Any]]):
+    async def _handle_new_devices(self, new_devices: list[USBDeviceSnapshot]):
         timestamp = datetime.now().astimezone().isoformat()
 
         for dev in new_devices:
-            simple_uid = dev["uid"]
-            full_system_uid = dev["full_system_uid"]
+            simple_uid = dev.uid
+            full_system_uid = dev.full_system_uid
 
             if full_system_uid in self.device_registry:
                 old_dev = self.device_registry[full_system_uid]
-                old_dev["bus"] = dev["bus"]
-                old_dev["address"] = dev["address"]
-                old_dev["is_connected"] = True
-                old_dev["last_seen"] = timestamp
+                old_dev.mark_connected(timestamp, dev.bus, dev.address)
                 dev = old_dev  # noqa: PLW2901
             else:
-                dev["is_connected"] = True
-                dev["last_seen"] = timestamp
+                dev.mark_connected(timestamp, dev.bus, dev.address)
                 self.device_registry[full_system_uid] = dev
 
                 if simple_uid not in self.devices_by_type:
                     self.devices_by_type[simple_uid] = set()
                 self.devices_by_type[simple_uid].add(full_system_uid)
 
-            manufacturer = dev.get("vendor_name", "Unknown")
-            product = dev.get("device_name", "Unknown")
+            manufacturer = dev.vendor_name or "Unknown"
+            product = dev.device_name or "Unknown"
 
-            connected_count = len(
-                [
-                    uid
-                    for uid in self.devices_by_type[simple_uid]
-                    if self.device_registry.get(uid, {}).get("is_connected", False)
-                ]
+            connected_count = sum(
+                1
+                for uid in self.devices_by_type[simple_uid]
+                if self.device_registry.get(uid) is not None
+                and self.device_registry[uid].is_connected
             )
 
             logger.info(
@@ -175,20 +171,17 @@ class USBMonitoringService:
             dev = self.device_registry.get(full_system_uid)
 
             if dev:
-                dev["is_connected"] = False
-                dev["last_seen"] = timestamp
-                self.device_registry[full_system_uid] = dev
+                dev.mark_disconnected(timestamp)
 
-                manufacturer = dev.get("vendor_name", "Unknown")
-                product = dev.get("device_name", "Unknown")
-                simple_uid = dev["uid"]
+                manufacturer = dev.vendor_name or "Unknown"
+                product = dev.device_name or "Unknown"
+                simple_uid = dev.uid
 
-                connected_count = len(
-                    [
-                        uid
-                        for uid in self.devices_by_type.get(simple_uid, set())
-                        if self.device_registry.get(uid, {}).get("is_connected", False)
-                    ]
+                connected_count = sum(
+                    1
+                    for uid in self.devices_by_type.get(simple_uid, set())
+                    if self.device_registry.get(uid) is not None
+                    and self.device_registry[uid].is_connected
                 )
 
                 logger.info(
@@ -212,8 +205,8 @@ class USBMonitoringService:
         logger.info("Currently connected devices: %d", len(initial_devices))
 
         for dev in initial_devices:
-            simple_uid = dev["uid"]
-            full_system_uid = dev["full_system_uid"]
+            simple_uid = dev.uid
+            full_system_uid = dev.full_system_uid
             self.device_registry[full_system_uid] = dev
 
             if simple_uid not in self.devices_by_type:
@@ -223,28 +216,26 @@ class USBMonitoringService:
 
             logger.info(
                 "  - %s %s ('%s')",
-                dev.get("vendor_name", "Unknown"),
-                dev.get("device_name", "Unknown"),
-                dev["full_system_uid"],
+                dev.vendor_name or "Unknown",
+                dev.device_name or "Unknown",
+                dev.full_system_uid,
             )
 
-    async def run(self, callback: Callable[[str, dict], Awaitable[None]] | None = None):
+    async def run(self, callback: Callable[[str, USBDeviceSnapshot], Awaitable[None]] | None = None):
         self._callback = callback
         await self.init_tracking()
 
         try:
             while not self._shutdown_event.is_set():
                 current_devices_list = await self.get_current_devices()
-                current_system_uids = {
-                    dev["full_system_uid"] for dev in current_devices_list
-                }
+                current_system_uids = {dev.full_system_uid for dev in current_devices_list}
 
                 new_system_uids = current_system_uids - self.previous_system_uids
                 if new_system_uids:
                     new_devices = [
                         dev
                         for dev in current_devices_list
-                        if dev["full_system_uid"] in new_system_uids
+                        if dev.full_system_uid in new_system_uids
                     ]
                     await self._handle_new_devices(new_devices)
 
@@ -265,7 +256,7 @@ class USBMonitoringService:
             logger.info("Monitoring stopped")
 
     async def start(
-        self, callback: Callable[[str, dict], Awaitable[None]] | None = None
+        self, callback: Callable[[str, USBDeviceSnapshot], Awaitable[None]] | None = None
     ):
         await self.run(callback)
 
@@ -279,35 +270,26 @@ class USBMonitoringService:
         except TimeoutError:
             return False
 
-    def get_all_devices(self) -> dict[str, dict[str, Any]]:
+    def get_all_devices(self) -> dict[str, USBDeviceSnapshot]:
         return self.device_registry.copy()
 
-    def get_connected_devices(self) -> list[dict[str, Any]]:
-        return [
-            dev
-            for dev in self.device_registry.values()
-            if dev.get("is_connected", False)
-        ]
+    def get_connected_devices(self) -> list[USBDeviceSnapshot]:
+        return [dev for dev in self.device_registry.values() if dev.is_connected]
 
-    def get_disconnected_devices(self) -> list[dict[str, Any]]:
-        return [
-            dev
-            for dev in self.device_registry.values()
-            if not dev.get("is_connected", True)
-        ]
+    def get_disconnected_devices(self) -> list[USBDeviceSnapshot]:
+        return [dev for dev in self.device_registry.values() if not dev.is_connected]
 
-    def get_devices_by_type(self, simple_uid: str) -> list[dict[str, Any]]:
+    def get_devices_by_type(self, simple_uid: str) -> list[USBDeviceSnapshot]:
         return [
             self.device_registry[full_uid]
             for full_uid in self.devices_by_type[simple_uid]
             if full_uid in self.device_registry
         ]
 
-    def get_connected_devices_by_type(self, simple_uid: str) -> list[dict[str, Any]]:
-        devices = self.get_devices_by_type(simple_uid)
-        return [dev for dev in devices if dev.get("is_connected", False)]
+    def get_connected_devices_by_type(self, simple_uid: str) -> list[USBDeviceSnapshot]:
+        return [dev for dev in self.get_devices_by_type(simple_uid) if dev.is_connected]
 
-    def get_device_by_full_uid(self, full_system_uid: str) -> dict[str, Any] | None:
+    def get_device_by_full_uid(self, full_system_uid: str) -> USBDeviceSnapshot | None:
         return self.device_registry.get(full_system_uid)
 
     def get_device_types(self) -> list[str]:
@@ -326,15 +308,16 @@ class USBMonitoringService:
                 connected_count = sum(
                     1
                     for uid in full_uids
-                    if self.device_registry.get(uid, {}).get("is_connected", False)
+                    if self.device_registry.get(uid) is not None
+                    and self.device_registry[uid].is_connected
                 )
                 total_count = len(full_uids)
 
                 summary[simple_uid] = {
-                    "vendor_id": sample_device["vendor_id"],
-                    "device_id": sample_device["device_id"],
-                    "vendor_name": sample_device.get("vendor_name", "Unknown"),
-                    "device_name": sample_device.get("device_name", "Unknown"),
+                    "vendor_id": sample_device.vendor_id,
+                    "device_id": sample_device.device_id,
+                    "vendor_name": sample_device.vendor_name or "Unknown",
+                    "device_name": sample_device.device_name or "Unknown",
                     "connected_count": connected_count,
                     "total_seen_count": total_count,
                     "disconnected_count": total_count - connected_count,

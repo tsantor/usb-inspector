@@ -42,7 +42,7 @@ def test_service_get_device_info_uses_ports():
 
     info = service.get_device_info(device)
 
-    assert info["vendor_id"] == "1234"
-    assert info["device_id"] == "5678"
-    assert "vendor_name" in info
-    assert info["full_system_uid"].endswith("SERIAL")
+    assert info.vendor_id == "1234"
+    assert info.device_id == "5678"
+    assert info.vendor_name is not None
+    assert info.full_system_uid.endswith("SERIAL")

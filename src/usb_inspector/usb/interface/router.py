@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import json
 import signal
 
@@ -63,7 +64,7 @@ def monitor():
 
         async def callback(event_type, device_info):
             click.secho(
-                f"{event_type.upper()}: {json.dumps(device_info, indent=2)}",
+                f"{event_type.upper()}: {json.dumps(dataclasses.asdict(device_info), indent=2)}",
                 fg="cyan" if event_type == "connected" else "yellow",
             )
 
