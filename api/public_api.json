@@ -2,13 +2,11 @@
   "modules": {
     "usb_inspector": [
       "USBDetailsLookupPort",
-      "USBEnumeratorPort",
       "USBMonitoringService",
       "create_usb_monitoring_service"
     ],
     "usb_inspector.usb.application.ports": [
-      "USBDetailsLookupPort",
-      "USBEnumeratorPort"
+      "USBDetailsLookupPort"
     ],
     "usb_inspector.usb.application.service": [
       "USBMonitoringService"

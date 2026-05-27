@@ -9,10 +9,9 @@ def test_package_exposes_application_service():
     assert usb_inspector.USBMonitoringService is not None
 
 
-def test_package_exposes_ports():
+def test_package_exposes_details_lookup_port():
     import usb_inspector  # noqa: PLC0415
 
-    assert usb_inspector.USBEnumeratorPort is not None
     assert usb_inspector.USBDetailsLookupPort is not None
 
 

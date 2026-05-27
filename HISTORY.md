@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file. This projec
 
 **Breaking changes**
 
-- REMOVED `USBDeviceMonitor` from the public API. Use `create_usb_monitoring_service()` instead, which returns a `USBMonitoringService` instance with the same behaviour.
+- REMOVED `USBDeviceMonitor` from the public API. Use `create_usb_monitoring_service()` instead, which returns a `USBMonitoringService` instance with the same behavior.
 - REMOVED standalone free functions `lookup_usb_details`, `delete_usb_db`, `delete_data_file`, and `update_usb_db` from `usb_inspector.usb.infrastructure.repository`. Use `SQLiteUSBDetailsRepository` and `USBDatabaseMaintenanceRepository` directly.
 - CHANGED public API of `usb_inspector` package now exports `USBMonitoringService`, `USBEnumeratorPort`, `USBDetailsLookupPort`, and `create_usb_monitoring_service`. Importing `USBDeviceMonitor` from the top-level package will raise `ImportError`.
 
