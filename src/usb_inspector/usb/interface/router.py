@@ -55,7 +55,10 @@ def delete_data():
 
 @cli.command()
 def monitor():
+    service = None
+
     async def run_monitor():
+        nonlocal service
         service = get_monitoring_service(poll_interval=1.0)
 
         async def callback(event_type, device_info):
@@ -64,18 +67,35 @@ def monitor():
                 fg="cyan" if event_type == "connected" else "yellow",
             )
 
-        click.secho("Starting USB device monitor. Press Ctrl+X to stop.", fg="green")
+        click.secho("Starting USB device monitor. Press Ctrl+C to stop.", fg="green")
         await service.run(callback)
 
     def stop_monitor():
         click.secho("\nStopping USB device monitor...", fg="red")
-        loop.stop()
+        if service is not None:
+            loop.create_task(service.stop())
+
+    def _register_signal_handlers():
+        # Windows does not expose SIGQUIT and some event loops do not support
+        # add_signal_handler; register only what's available.
+        for name in ("SIGINT", "SIGTERM", "SIGQUIT"):
+            sig = getattr(signal, name, None)
+            if sig is None:
+                continue
+            try:
+                loop.add_signal_handler(sig, stop_monitor)
+            except NotImplementedError:
+                # Fallback for platforms/event loops without signal support.
+                continue
 
     loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGQUIT, stop_monitor)
+    _register_signal_handlers()
     try:
         loop.run_until_complete(run_monitor())
     except asyncio.CancelledError:
         pass
+    except KeyboardInterrupt:
+        if service is not None:
+            loop.run_until_complete(service.stop())
     finally:
         loop.close()
