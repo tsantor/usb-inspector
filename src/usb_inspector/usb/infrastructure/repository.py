@@ -8,10 +8,10 @@ import pandas as pd
 import requests
 import usb.core
 
-from usb_inspector.data_utils import data_file
-from usb_inspector.paths import usb_db
 from usb_inspector.usb.infrastructure.mappers import normalize_device_id
 from usb_inspector.usb.infrastructure.mappers import normalize_vendor_id
+from usb_inspector.usb.infrastructure.paths import data_file
+from usb_inspector.usb.infrastructure.paths import usb_db
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,9 @@ class USBDatabaseMaintenanceRepository:
         conn.commit()
         conn.close()
 
-    def update_existing_database(self, vendors_df: pd.DataFrame, devices_df: pd.DataFrame):
+    def update_existing_database(
+        self, vendors_df: pd.DataFrame, devices_df: pd.DataFrame
+    ):
         conn = sqlite3.connect(usb_db)
         conn.execute("PRAGMA foreign_keys = ON")
 
@@ -212,4 +214,3 @@ class USBDatabaseMaintenanceRepository:
         vendors_df, devices_df = self.parse_usb_ids_to_dataframes(data)
         self.update_existing_database(vendors_df, devices_df)
         return True
-

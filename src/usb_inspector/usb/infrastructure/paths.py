@@ -1,3 +1,4 @@
+from importlib import resources
 from pathlib import Path
 
 import platformdirs
@@ -10,3 +11,4 @@ data_dir = Path(
     )
 )
 usb_db = data_dir / "usb_data.db"
+data_file = resources.files("usb_inspector.data") / "usb.ids"
