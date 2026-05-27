@@ -1,6 +1,5 @@
-set shell := ["bash", "-cu"]
-
-# set shell := ["powershell.exe", "-NoLogo", "-Command"]
+set shell := ["sh", "-cu"]
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
 # List all available recipes
 default:
@@ -15,22 +14,18 @@ just-format:
 # -----------------------------------------------------------------------------
 
 python_version := "3.13.1"
-aws_profile := "xstudios"
-s3_bucket := "xstudios-pypi"
-
-package_name := 'usb_inspector'
 cov_fail_under := "81"
+package_name := 'usb_inspector'
+version := '1.0.0'
 
 # Dynamic variables (evaluated at runtime - DO NOT EDIT)
-wheel_name := `basename $(ls dist/*.whl 2>/dev/null | head -n 1) 2>/dev/null || echo ""`
-package_url := "https://" + s3_bucket + ".s3.amazonaws.com/" + wheel_name
+wheel_name := package_name + "-" + version + "-py3-none-any.whl"
+package_url := "https://xstudios-pypi.s3.amazonaws.com/" + wheel_name
 
 # Show variable values
 [group('help')]
 show-vars:
     @echo "Python Version: {{ python_version }}"
-    @echo "AWS Profile: {{ aws_profile }}"
-    @echo "S3 Bucket: {{ s3_bucket }}"
     @echo "Coverage Fail Under: {{ cov_fail_under }}"
     @echo "Package Name: {{ package_name }}"
     @echo "Wheel Name: {{ wheel_name }}"
@@ -314,7 +309,7 @@ twine-fix:
 # Push distro to S3 bucket
 [group('s3')]
 push-to-s3:
-    aws s3 sync --profile={{ aws_profile }} --acl public-read ./dist/ s3://{{ s3_bucket }}/ \
+    aws s3 sync --profile=xstudios --acl public-read ./dist/ s3://xstudios-pypi/ \
       --exclude "*" --include "*.whl"
     echo "{{ package_url }}"
 
