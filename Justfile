@@ -320,7 +320,7 @@ push-to-s3:
 
 user := "pi"
 host := "192.168.1.48"
-remote_dir := "/home/pi/Sandbox/Python/my-pypi-packages/{{package_name}}"
+remote_dir := "/home/pi/Sandbox/Python/my-pypi-packages/usb-inspector"
 
 # Sync files to Raspberry Pi
 [group('project')]
