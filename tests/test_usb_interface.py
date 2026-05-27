@@ -1,23 +1,15 @@
 import asyncio
-import importlib
 import json
 from unittest.mock import MagicMock
 
 from click.testing import CliRunner
 
-from usb_inspector.usb.application.service import USBMonitoringService
-from usb_inspector.usb.infrastructure.repository import SQLiteUSBDetailsRepository
-from usb_inspector.usb.infrastructure.repository import USBDatabaseMaintenanceRepository
-
-# presentation/__init__.py binds 'cli' to the Click group, shadowing the cli.py
-# module on attribute lookup — use importlib to get the actual module.
-cli_module = importlib.import_module("usb_inspector.usb.presentation.cli")
+from usb_inspector.usb.presentation.cli import cli
 
 
 class _FakeLoop:
     def __init__(self):
         self.closed = False
-        self.stopped = False
 
     def add_signal_handler(self, *_args, **_kwargs):
         return None
@@ -29,19 +21,16 @@ class _FakeLoop:
     def close(self):
         self.closed = True
 
-    def stop(self):
-        self.stopped = True
 
-
-def test_cli_imports_infrastructure_directly():
-    assert cli_module.create_usb_monitoring_service is not None
-    assert cli_module.SQLiteUSBDetailsRepository is SQLiteUSBDetailsRepository
-    assert cli_module.USBDatabaseMaintenanceRepository is USBDatabaseMaintenanceRepository
-
-
-def test_create_usb_monitoring_service_returns_service():
-    service = cli_module.create_usb_monitoring_service()
-    assert isinstance(service, USBMonitoringService)
+def _services(**overrides):
+    """Build a minimal services dict for CLI tests."""
+    defaults = {
+        "lookup_service": MagicMock(),
+        "maintenance_service": MagicMock(),
+        "monitoring_service": MagicMock(),
+    }
+    defaults.update(overrides)
+    return defaults
 
 
 def test_interface_package_exports_cli():
@@ -50,55 +39,57 @@ def test_interface_package_exports_cli():
     assert presentation_package.cli is not None
 
 
-def test_lookup_command_outputs_json(monkeypatch):
-    fake_details_repo = MagicMock()
-    fake_details_repo.lookup.return_value = {
+def test_lookup_command_outputs_json():
+    fake_lookup = MagicMock()
+    fake_lookup.lookup.return_value = {
         "vendor_id": "1a40",
         "vendor_name": "Terminus Technology Inc.",
         "device_id": "0801",
         "device_name": "USB 2.0 Hub",
     }
-    monkeypatch.setattr(cli_module, "SQLiteUSBDetailsRepository", lambda: fake_details_repo)
 
-    result = CliRunner().invoke(cli_module.cli, ["lookup", "-v", "1A40", "-d", "0801"])
+    result = CliRunner().invoke(
+        cli, ["lookup", "-v", "1A40", "-d", "0801"], obj=_services(lookup_service=fake_lookup)
+    )
 
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert parsed["vendor_name"] == "Terminus Technology Inc."
 
 
-def test_lookup_command_not_found_message(monkeypatch):
-    fake_details_repo = MagicMock()
-    fake_details_repo.lookup.return_value = None
-    monkeypatch.setattr(cli_module, "SQLiteUSBDetailsRepository", lambda: fake_details_repo)
+def test_lookup_command_not_found_message():
+    fake_lookup = MagicMock()
+    fake_lookup.lookup.return_value = None
 
-    result = CliRunner().invoke(cli_module.cli, ["lookup", "-v", "0000"])
+    result = CliRunner().invoke(
+        cli, ["lookup", "-v", "0000"], obj=_services(lookup_service=fake_lookup)
+    )
 
     assert result.exit_code == 0
     assert "No details found" in result.output
 
 
-def test_update_delete_commands_invoke_maintenance_repo(monkeypatch):
-    maintenance = MagicMock()
-    monkeypatch.setattr(cli_module, "USBDatabaseMaintenanceRepository", lambda: maintenance)
+def test_update_delete_commands_invoke_maintenance_service():
+    fake_maintenance = MagicMock()
     runner = CliRunner()
 
-    assert runner.invoke(cli_module.cli, ["update-db"]).exit_code == 0
-    assert runner.invoke(cli_module.cli, ["delete-db"]).exit_code == 0
-    assert runner.invoke(cli_module.cli, ["delete-data"]).exit_code == 0
+    assert runner.invoke(cli, ["update-db"], obj=_services(maintenance_service=fake_maintenance)).exit_code == 0
+    assert runner.invoke(cli, ["delete-db"], obj=_services(maintenance_service=fake_maintenance)).exit_code == 0
+    assert runner.invoke(cli, ["delete-data"], obj=_services(maintenance_service=fake_maintenance)).exit_code == 0
 
-    maintenance.update_usb_db.assert_called_once()
-    maintenance.delete_usb_db.assert_called_once()
-    maintenance.delete_data_file.assert_called_once()
+    fake_maintenance.update_db.assert_called_once()
+    fake_maintenance.delete_db.assert_called_once()
+    fake_maintenance.delete_data_file.assert_called_once()
 
 
 def test_monitor_command_handles_cancelled_loop(monkeypatch):
     fake_loop = _FakeLoop()
     fake_service = MagicMock()
-    monkeypatch.setattr(cli_module.asyncio, "get_event_loop", lambda: fake_loop)
-    monkeypatch.setattr(cli_module, "create_usb_monitoring_service", lambda poll_interval=1.0: fake_service)
+    monkeypatch.setattr(asyncio, "get_event_loop", lambda: fake_loop)
 
-    result = CliRunner().invoke(cli_module.cli, ["monitor"])
+    result = CliRunner().invoke(
+        cli, ["monitor"], obj=_services(monitoring_service=fake_service)
+    )
 
     assert result.exit_code == 0
     assert fake_loop.closed is True

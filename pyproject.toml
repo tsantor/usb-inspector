@@ -51,7 +51,7 @@ Issues = "https://bitbucket.org/xstudios/usb-inspector/issues"
 Changelog = "https://bitbucket.org/xstudios/usb-inspector/blob/master/HISTORY.md"
 
 [project.scripts]
-usb-inspector = "usb_inspector.usb.interface.router:cli"
+usb-inspector = "usb_inspector.main:main"
 
 [build-system]
 requires = ["hatchling", "xapp-tools"]

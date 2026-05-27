@@ -5,14 +5,12 @@ import signal
 
 import click
 
-from usb_inspector.usb.infrastructure.factory import create_usb_monitoring_service
-from usb_inspector.usb.infrastructure.repository import SQLiteUSBDetailsRepository
-from usb_inspector.usb.infrastructure.repository import USBDatabaseMaintenanceRepository
-
 
 @click.group()
-def cli():
+@click.pass_context
+def cli(ctx):
     """USB Inspector CLI"""
+    ctx.ensure_object(dict)
 
 
 @cli.command()
@@ -25,8 +23,9 @@ def cli():
     required=False,
     help="Device ID of the USB device (4-digit hex)",
 )
-def lookup(vendor_id, device_id):
-    details = SQLiteUSBDetailsRepository().lookup(vendor_id, device_id)
+@click.pass_obj
+def lookup(services, vendor_id, device_id):
+    details = services["lookup_service"].lookup(vendor_id, device_id)
     if details:
         click.echo(json.dumps(details, indent=2))
     else:
@@ -37,31 +36,32 @@ def lookup(vendor_id, device_id):
 
 
 @cli.command()
-def update_db():
-    USBDatabaseMaintenanceRepository().update_usb_db()
+@click.pass_obj
+def update_db(services):
+    services["maintenance_service"].update_db()
     click.secho("✅ USB database updated successfully.", fg="green")
 
 
 @cli.command()
-def delete_db():
-    USBDatabaseMaintenanceRepository().delete_usb_db()
+@click.pass_obj
+def delete_db(services):
+    services["maintenance_service"].delete_db()
     click.secho("✅ USB database deleted successfully.", fg="green")
 
 
 @cli.command()
-def delete_data():
-    USBDatabaseMaintenanceRepository().delete_data_file()
+@click.pass_obj
+def delete_data(services):
+    services["maintenance_service"].delete_data_file()
     click.secho("✅ Data file deleted successfully.", fg="green")
 
 
 @cli.command()
-def monitor():
-    service = None
+@click.pass_obj
+def monitor(services):
+    service = services["monitoring_service"]
 
     async def run_monitor():
-        nonlocal service
-        service = create_usb_monitoring_service(poll_interval=1.0)
-
         async def callback(event_type, device_info):
             click.secho(
                 f"{event_type.upper()}: {json.dumps(dataclasses.asdict(device_info), indent=2)}",
@@ -73,8 +73,7 @@ def monitor():
 
     def stop_monitor():
         click.secho("\nStopping USB device monitor...", fg="red")
-        if service is not None:
-            loop.create_task(service.stop())
+        loop.create_task(service.stop())
 
     def _register_signal_handlers():
         # Windows does not expose SIGQUIT and some event loops do not support
@@ -86,7 +85,6 @@ def monitor():
             try:
                 loop.add_signal_handler(sig, stop_monitor)
             except NotImplementedError:
-                # Fallback for platforms/event loops without signal support.
                 continue
 
     loop = asyncio.get_event_loop()
@@ -96,7 +94,6 @@ def monitor():
     except asyncio.CancelledError:
         pass
     except KeyboardInterrupt:
-        if service is not None:
-            loop.run_until_complete(service.stop())
+        loop.run_until_complete(service.stop())
     finally:
         loop.close()
