@@ -32,13 +32,13 @@ usb-inspector update-db
 ```python
 import asyncio
 
-from usb_inspector.usb.infrastructure.monitor import USBDeviceMonitor
+from usb_inspector import create_usb_monitoring_service
 
 async def main():
-    usb_monitor = USBDeviceMonitor(poll_interval=1.0)
-    monitor_task = asyncio.create_task(usb_monitor.run())  # or usb_monitor.start()
+    service = create_usb_monitoring_service(poll_interval=1.0)
+    monitor_task = asyncio.create_task(service.run())
     await asyncio.sleep(10)
-    await usb_monitor.stop()
+    await service.stop()
     await monitor_task
 
 asyncio.run(main())
