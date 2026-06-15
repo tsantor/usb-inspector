@@ -6,7 +6,7 @@ default:
     @just --list
 
 # Format all Justfiles in the project
-just-format:
+format-me:
     just --fmt --unstable
 
 # -----------------------------------------------------------------------------
@@ -15,21 +15,7 @@ just-format:
 
 python_version := "3.13.1"
 cov_fail_under := "81"
-package_name := 'usb_inspector'
-version := '1.0.0'
-
-# Dynamic variables (evaluated at runtime - DO NOT EDIT)
-wheel_name := package_name + "-" + version + "-py3-none-any.whl"
-package_url := "https://xstudios-pypi.s3.amazonaws.com/" + wheel_name
-
-# Show variable values
-[group('help')]
-show-vars:
-    @echo "Python Version: {{ python_version }}"
-    @echo "Coverage Fail Under: {{ cov_fail_under }}"
-    @echo "Package Name: {{ package_name }}"
-    @echo "Wheel Name: {{ wheel_name }}"
-    @echo "Package URL: {{ package_url }}"
+package_name := "usb_inspector"
 
 # DO NOT EDIT BELOW THIS LINE - auto-generated from template
 # -----------------------------------------------------------------------------
@@ -63,12 +49,12 @@ pip-install-editable:
 # Add dev dependencies
 [group('uv')]
 uv-add-dev-dependencies:
-    uv add twine wheel build ruff pre-commit --group dev
+    uv add twine hatch xapp-tools ruff pre-commit --group dev
 
 # Add test dependencies
 [group('uv')]
 uv-add-test-dependencies:
-    uv add pytest pytest-cov pytest-mock pytest-asyncio coverage --group test
+    uv add pytest-cov pytest-mock pytest-asyncio coverage --group test
 
 # Run pip list
 [group('uv')]
@@ -257,14 +243,14 @@ clean-all: clean clean-tests
 # Show src directory tree
 [group('misc')]
 tree:
-    tree src -I '__pycache__|*.egg-info'
+    tree src -I '__pycache__'
 
 # Show full directory tree
 [group('misc')]
 tree-root:
-    tree -I '.claude|.tmp|.coverage|htmlcov|dist|build|.eggs|*.egg-info|__pycache__|.pytest_cache|.ruff_cache|.tox|.vscode|node_modules|*.csv'
+    tree --dirsfirst -I '.claude|.tmp|.coverage|htmlcov|dist|build|.eggs|*.egg-info|__pycache__|.pytest_cache|.ruff_cache|.tox|.vscode|node_modules'
 
-# ----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Deploy
 # -----------------------------------------------------------------------------
 
@@ -306,14 +292,12 @@ twine-fix:
 # X Studios S3 PyPi
 # -----------------------------------------------------------------------------
 
-# Push distro to S3 bucket
-[group('s3')]
-push-to-s3:
-    aws s3 sync --profile=xstudios --acl public-read ./dist/ s3://xstudios-pypi/ \
-      --exclude "*" --include "*.whl"
-    echo "{{ package_url }}"
+# Deploy to private PyPi repo on S3
+[group('deploy')]
+deploy: dist
+    pypi-sync dist/*.whl
 
-# DO NOT EDIT ABOVE THIS LINE UNLESS YOU KNOW WHAT YOU'RE DOING
+# DO NOT EDIT ABOVE THIS LINE - auto-generated from template
 # -----------------------------------------------------------------------------
 # Project Specific
 # -----------------------------------------------------------------------------
@@ -331,3 +315,4 @@ rsync-to-pi:
       --exclude='.pytest_cache' --exclude='.ruff_cache' --exclude='.tox' \
       --exclude='.vscode' --exclude='node_modules' --exclude='dist' \
       --exclude='*.egg-info' --exclude=".tmp"
+
