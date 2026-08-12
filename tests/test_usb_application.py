@@ -24,11 +24,11 @@ class FakeLookup:
 
 
 class FakeUSBDevice:
-    def __init__(self, serial, port_numbers=(1,), address=2):
+    def __init__(self, serial, port_numbers=(1,), address=2, bus=1):
         self.idVendor = 0x1234
         self.idProduct = 0x5678
         self.bcdDevice = 0x0100
-        self.bus = 1
+        self.bus = bus
         self.address = address
         self.port_numbers = port_numbers
         self.manufacturer = "Short Vendor"
@@ -110,13 +110,13 @@ async def test_serial_read_failure_reuses_identity_from_usb_topology():
 
 
 @pytest.mark.asyncio
-async def test_serial_recovery_enriches_initial_topology_identity():
+async def test_serial_recovery_migrates_initial_topology_identity():
     enumerator = FakeEnumerator([FakeUSBDevice(None)])
     service = make_service([])
     service._enumerator = enumerator  # noqa: SLF001
 
     await service.init_tracking()
-    canonical_uid = "1234:5678:bus1:port1"
+    canonical_uid = "1234:5678:RECOVERED"
     enumerator.devices = [FakeUSBDevice("RECOVERED")]
     current_devices = await service.get_current_devices()
     service._refresh_known_devices(current_devices)  # noqa: SLF001
@@ -155,3 +155,117 @@ async def test_different_serial_at_same_port_is_a_replacement():
 
     assert current_devices[0].full_system_uid == "1234:5678:SECOND"
     assert current_devices[0].full_system_uid not in service.previous_system_uids
+
+
+@pytest.mark.asyncio
+async def test_known_serial_reconnect_at_same_port_refreshes_details_and_reuses_record():
+    enumerator = FakeEnumerator([FakeUSBDevice("SERIAL", address=2)])
+    service = make_service([])
+    service._enumerator = enumerator  # noqa: SLF001
+    events = []
+
+    async def callback(event, device):
+        events.append((event, device.full_system_uid))
+
+    service._callback = callback  # noqa: SLF001
+    await service.init_tracking()
+    uid = "1234:5678:SERIAL"
+    await service._handle_removed_devices({uid})  # noqa: SLF001
+    service.previous_system_uids = set()
+    enumerator.devices = [FakeUSBDevice("SERIAL", address=99)]
+
+    current_devices = await service.get_current_devices()
+    service._refresh_known_devices(current_devices)  # noqa: SLF001
+    await service._handle_new_devices(current_devices)  # noqa: SLF001
+
+    assert set(service.device_registry) == {uid}
+    device = service.device_registry[uid]
+    assert (device.bus, device.address, device.port, device.is_connected) == (1, 99, "1", True)
+    assert events == [("disconnected", uid), ("connected", uid)]
+
+
+@pytest.mark.asyncio
+async def test_known_serial_reconnect_at_different_port_reuses_record_and_alias():
+    enumerator = FakeEnumerator([FakeUSBDevice("SERIAL", port_numbers=(1,))])
+    service = make_service([])
+    service._enumerator = enumerator  # noqa: SLF001
+    await service.init_tracking()
+    uid = "1234:5678:SERIAL"
+    await service._handle_removed_devices({uid})  # noqa: SLF001
+    service.previous_system_uids = set()
+    enumerator.devices = [FakeUSBDevice("SERIAL", port_numbers=(2,), address=9)]
+
+    current_devices = await service.get_current_devices()
+    service._refresh_known_devices(current_devices)  # noqa: SLF001
+    await service._handle_new_devices(current_devices)  # noqa: SLF001
+
+    assert set(service.device_registry) == {uid}
+    assert service.device_registry[uid].port == "2"
+    assert service.topology_to_system_uid == {"1234:5678:bus1:port2": uid}
+
+
+@pytest.mark.asyncio
+async def test_missing_serial_reconnects_at_same_port_using_known_alias():
+    enumerator = FakeEnumerator([FakeUSBDevice("SERIAL")])
+    service = make_service([])
+    service._enumerator = enumerator  # noqa: SLF001
+    await service.init_tracking()
+    uid = "1234:5678:SERIAL"
+    reconnected_address = 9
+    await service._handle_removed_devices({uid})  # noqa: SLF001
+    service.previous_system_uids = set()
+    enumerator.devices = [
+        FakeUSBDevice(RuntimeError("serial unavailable"), address=reconnected_address)
+    ]
+
+    current_devices = await service.get_current_devices()
+    service._refresh_known_devices(current_devices)  # noqa: SLF001
+    await service._handle_new_devices(current_devices)  # noqa: SLF001
+
+    assert set(service.device_registry) == {uid}
+    assert service.device_registry[uid].address == reconnected_address
+
+
+@pytest.mark.asyncio
+async def test_missing_serial_at_a_different_port_uses_a_new_fallback_identity():
+    enumerator = FakeEnumerator([FakeUSBDevice("SERIAL", port_numbers=(1,))])
+    service = make_service([])
+    service._enumerator = enumerator  # noqa: SLF001
+    await service.init_tracking()
+    uid = "1234:5678:SERIAL"
+    await service._handle_removed_devices({uid})  # noqa: SLF001
+    service.previous_system_uids = set()
+    enumerator.devices = [FakeUSBDevice(RuntimeError("serial unavailable"), port_numbers=(2,))]
+
+    current_devices = await service.get_current_devices()
+
+    assert current_devices[0].full_system_uid == "1234:5678:bus1:port2"
+
+
+@pytest.mark.asyncio
+async def test_serial_recovery_merges_different_port_fallback_into_known_device():
+    enumerator = FakeEnumerator([FakeUSBDevice("SERIAL", port_numbers=(1,))])
+    service = make_service([])
+    service._enumerator = enumerator  # noqa: SLF001
+    await service.init_tracking()
+    serial_uid = "1234:5678:SERIAL"
+    fallback_uid = "1234:5678:bus1:port2"
+    recovered_address = 9
+    await service._handle_removed_devices({serial_uid})  # noqa: SLF001
+    service.previous_system_uids = set()
+
+    enumerator.devices = [FakeUSBDevice(RuntimeError("serial unavailable"), port_numbers=(2,))]
+    fallback_devices = await service.get_current_devices()
+    await service._handle_new_devices(fallback_devices)  # noqa: SLF001
+    service.previous_system_uids = {fallback_uid}
+
+    enumerator.devices = [
+        FakeUSBDevice("SERIAL", port_numbers=(2,), address=recovered_address)
+    ]
+    recovered_devices = await service.get_current_devices()
+    service._refresh_known_devices(recovered_devices)  # noqa: SLF001
+
+    assert set(service.device_registry) == {serial_uid}
+    assert service.previous_system_uids == {serial_uid}
+    assert service.device_registry[serial_uid].is_connected is True
+    assert service.device_registry[serial_uid].address == recovered_address

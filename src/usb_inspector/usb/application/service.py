@@ -156,41 +156,88 @@ class USBMonitoringService:
         device has been seen at a USB port, that port maps to its canonical
         identity so a transient serial read failure cannot create a duplicate.
         """
-        topology_key = device.topology_key
-        if topology_key:
-            known_uid = self.topology_to_system_uid.get(topology_key)
-            known_device = self.device_registry.get(known_uid) if known_uid else None
+        topology_uid = (
+            self.topology_to_system_uid.get(device.topology_key)
+            if device.topology_key
+            else None
+        )
 
-            if known_device:
-                if device.serial and known_device.serial and device.serial != known_device.serial:
-                    # A different serial at the same port is a replacement, not
-                    # a transient failure. Let normal removed/new handling
-                    # represent it as such.
-                    device.full_system_uid = (
-                        f"{device.vendor_id}:{device.device_id}:{device.serial}"
-                    )
-                else:
-                    device.full_system_uid = known_uid
-                return device
+        if device.serial:
+            serial_uid = f"{device.vendor_id}:{device.device_id}:{device.serial}"
+            topology_device = (
+                self.device_registry.get(topology_uid) if topology_uid else None
+            )
 
-        if device.serial and device.full_system_uid in self.device_registry:
-            # The device may have moved ports; the serial preserves continuity.
+            if topology_device and topology_uid != serial_uid:
+                if topology_device.serial and topology_device.serial != device.serial:
+                    # A distinct serial at the same port is a physical replacement.
+                    return device
+                self._migrate_registry_identity(topology_uid, serial_uid)
+
+            device.full_system_uid = serial_uid
             return device
+
+        if topology_uid and topology_uid in self.device_registry:
+            device.full_system_uid = topology_uid
 
         return device
 
+    def _migrate_registry_identity(self, old_uid: str, new_uid: str) -> None:
+        """Move or merge a topology fallback record into its serial identity."""
+        if old_uid == new_uid:
+            return
+
+        old_device = self.device_registry.get(old_uid)
+        if old_device is None:
+            return
+
+        existing_device = self.device_registry.get(new_uid)
+        if existing_device is None:
+            old_device.full_system_uid = new_uid
+            self.device_registry[new_uid] = old_device
+        elif old_device.is_connected:
+            # The fallback record has already reported the reconnect. Retain
+            # that lifecycle state while consolidating it into the serial UID.
+            existing_device.is_connected = True
+            existing_device.last_seen = old_device.last_seen
+
+        self.device_registry.pop(old_uid, None)
+        device_uids = self.devices_by_type.get(old_device.uid)
+        if device_uids:
+            device_uids.discard(old_uid)
+            device_uids.add(new_uid)
+
+        if old_uid in self.previous_system_uids:
+            self.previous_system_uids.remove(old_uid)
+            self.previous_system_uids.add(new_uid)
+
+        for topology_key, mapped_uid in list(self.topology_to_system_uid.items()):
+            if mapped_uid == old_uid:
+                self.topology_to_system_uid[topology_key] = new_uid
+
     def _remember_identity(self, device: USBDeviceSnapshot) -> None:
         if device.topology_key:
+            if device.serial:
+                for topology_key, mapped_uid in list(self.topology_to_system_uid.items()):
+                    if mapped_uid == device.full_system_uid and topology_key != device.topology_key:
+                        del self.topology_to_system_uid[topology_key]
             self.topology_to_system_uid[device.topology_key] = device.full_system_uid
 
     @staticmethod
     def _refresh_observed_details(
         existing: USBDeviceSnapshot, observed: USBDeviceSnapshot
     ) -> None:
-        """Enrich an existing record without changing its connection timestamp."""
+        """Refresh observed data without changing lifecycle state or last_seen."""
+        existing.version = observed.version
+        existing.bus = observed.bus
+        existing.address = observed.address
+        existing.port = observed.port
+        existing.topology_key = observed.topology_key
+        existing.vendor_name = observed.vendor_name
+        existing.vendor_name_short = observed.vendor_name_short
+        existing.device_name = observed.device_name
         if observed.serial:
             existing.serial = observed.serial
-        existing.port = observed.port
 
     def _refresh_known_devices(self, current_devices: list[USBDeviceSnapshot]) -> None:
         for device in current_devices:
