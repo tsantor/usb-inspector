@@ -17,6 +17,7 @@ class USBDeviceSnapshot:
     vendor_name_short: str | None = None
     device_name: str | None = None
     serial: str | None = None
+    topology_key: str | None = None
 
     def mark_connected(self, timestamp: str, bus: int | None, address: int | None):
         self.is_connected = True

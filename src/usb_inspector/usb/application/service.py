@@ -10,6 +10,7 @@ from usb_inspector.usb.application.ports import USBEnumeratorPort
 from usb_inspector.usb.domain.entities import USBDeviceSnapshot
 
 logger = logging.getLogger(__name__)
+_UNREAD_SERIAL = object()
 
 
 class USBMonitoringService:
@@ -30,26 +31,51 @@ class USBMonitoringService:
         self.previous_system_uids: set[str] = set()
         self.device_registry: dict[str, USBDeviceSnapshot] = {}
         self.devices_by_type: dict[str, set[str]] = {}
+        # Keeps a device's identity stable when a backend temporarily cannot
+        # retrieve its USB serial number.  A USB address is intentionally not
+        # used when a port path is available because addresses can change on
+        # re-enumeration.
+        self.topology_to_system_uid: dict[str, str] = {}
         self._callback = None
 
     def get_simple_uid(self, device) -> str:
         return f"{device.idVendor:04x}:{device.idProduct:04x}"
 
-    def get_full_system_uid(self, device) -> str:
+    def get_full_system_uid(
+        self,
+        device,
+        serial: str | None | object = _UNREAD_SERIAL,
+        topology_key: str | None = None,
+    ) -> str:
         vendor_device = self.get_simple_uid(device)
 
-        try:
-            serial = device.serial_number
-            if serial:
-                return f"{vendor_device}:{serial}"
-        except Exception:  # pragma: no cover  # noqa: BLE001, S110
-            pass
+        if serial is _UNREAD_SERIAL:
+            serial = self.get_serial_number(device)
 
-        port_path = self.get_port_path(device)
-        if port_path:
-            return f"{vendor_device}:bus{device.bus}:port{port_path}"
+        if serial:
+            return f"{vendor_device}:{serial}"
+
+        if topology_key is None:
+            topology_key = self.get_topology_key(device, self.get_port_path(device))
+
+        if topology_key:
+            return topology_key
 
         return f"{vendor_device}:bus{device.bus}:address{device.address}"
+
+    def get_topology_key(self, device, port_path: str | None = None) -> str | None:
+        """Return the stable physical-location key when the backend exposes it."""
+        if port_path:
+            return f"{self.get_simple_uid(device)}:bus{device.bus}:port{port_path}"
+        return None
+
+    @staticmethod
+    def get_serial_number(device) -> str | None:
+        """Read the serial once so identity and displayed data cannot disagree."""
+        try:
+            return device.serial_number or None
+        except Exception:  # pragma: no cover  # noqa: BLE001
+            return None
 
     def get_port_path(self, device) -> str | None:
         try:
@@ -63,8 +89,10 @@ class USBMonitoringService:
         vendor_id_str = f"{device.idVendor:04x}"
         device_id_str = f"{device.idProduct:04x}"
         simple_uid = f"{vendor_id_str}_{device_id_str}"
-        full_system_uid = self.get_full_system_uid(device)
         port_path = self.get_port_path(device)
+        topology_key = self.get_topology_key(device, port_path)
+        serial = self.get_serial_number(device)
+        full_system_uid = self.get_full_system_uid(device, serial, topology_key)
         timestamp = datetime.now().astimezone().isoformat()
 
         try:
@@ -76,11 +104,6 @@ class USBMonitoringService:
             device_name = device.product
         except Exception:  # pragma: no cover  # noqa: BLE001
             device_name = None
-
-        try:
-            serial = device.serial_number
-        except Exception:  # pragma: no cover  # noqa: BLE001
-            serial = None
 
         cache_key = f"{vendor_id_str}:{device_id_str}"
         if cache_key not in self.usb_details_cache:
@@ -113,6 +136,7 @@ class USBMonitoringService:
             vendor_name_short=vendor_name_short,
             device_name=device_name,
             serial=serial,
+            topology_key=topology_key,
         )
 
     async def get_current_devices(self) -> list[USBDeviceSnapshot]:
@@ -120,9 +144,60 @@ class USBMonitoringService:
         return await loop.run_in_executor(None, self._get_devices_sync)
 
     def _get_devices_sync(self) -> list[USBDeviceSnapshot]:
-        return [
+        devices = [
             self.get_device_info(device) for device in self._enumerator.iter_devices()
         ]
+        return [self._reconcile_identity(device) for device in devices]
+
+    def _reconcile_identity(self, device: USBDeviceSnapshot) -> USBDeviceSnapshot:
+        """Resolve an observed device to its established canonical identity.
+
+        Serial numbers are preferred for a newly observed device.  Once a
+        device has been seen at a USB port, that port maps to its canonical
+        identity so a transient serial read failure cannot create a duplicate.
+        """
+        topology_key = device.topology_key
+        if topology_key:
+            known_uid = self.topology_to_system_uid.get(topology_key)
+            known_device = self.device_registry.get(known_uid) if known_uid else None
+
+            if known_device:
+                if device.serial and known_device.serial and device.serial != known_device.serial:
+                    # A different serial at the same port is a replacement, not
+                    # a transient failure. Let normal removed/new handling
+                    # represent it as such.
+                    device.full_system_uid = (
+                        f"{device.vendor_id}:{device.device_id}:{device.serial}"
+                    )
+                else:
+                    device.full_system_uid = known_uid
+                return device
+
+        if device.serial and device.full_system_uid in self.device_registry:
+            # The device may have moved ports; the serial preserves continuity.
+            return device
+
+        return device
+
+    def _remember_identity(self, device: USBDeviceSnapshot) -> None:
+        if device.topology_key:
+            self.topology_to_system_uid[device.topology_key] = device.full_system_uid
+
+    @staticmethod
+    def _refresh_observed_details(
+        existing: USBDeviceSnapshot, observed: USBDeviceSnapshot
+    ) -> None:
+        """Enrich an existing record without changing its connection timestamp."""
+        if observed.serial:
+            existing.serial = observed.serial
+        existing.port = observed.port
+
+    def _refresh_known_devices(self, current_devices: list[USBDeviceSnapshot]) -> None:
+        for device in current_devices:
+            existing = self.device_registry.get(device.full_system_uid)
+            if existing:
+                self._refresh_observed_details(existing, device)
+                self._remember_identity(device)
 
     async def _handle_new_devices(self, new_devices: list[USBDeviceSnapshot]):
         timestamp = datetime.now().astimezone().isoformat()
@@ -134,6 +209,7 @@ class USBMonitoringService:
             if full_system_uid in self.device_registry:
                 old_dev = self.device_registry[full_system_uid]
                 old_dev.mark_connected(timestamp, dev.bus, dev.address)
+                self._refresh_observed_details(old_dev, dev)
                 dev = old_dev  # noqa: PLW2901
             else:
                 dev.mark_connected(timestamp, dev.bus, dev.address)
@@ -142,6 +218,8 @@ class USBMonitoringService:
                 if simple_uid not in self.devices_by_type:
                     self.devices_by_type[simple_uid] = set()
                 self.devices_by_type[simple_uid].add(full_system_uid)
+
+            self._remember_identity(dev)
 
             manufacturer = dev.vendor_name or "Unknown"
             product = dev.device_name or "Unknown"
@@ -208,6 +286,7 @@ class USBMonitoringService:
             simple_uid = dev.uid
             full_system_uid = dev.full_system_uid
             self.device_registry[full_system_uid] = dev
+            self._remember_identity(dev)
 
             if simple_uid not in self.devices_by_type:
                 self.devices_by_type[simple_uid] = set()
@@ -228,6 +307,7 @@ class USBMonitoringService:
         try:
             while not self._shutdown_event.is_set():
                 current_devices_list = await self.get_current_devices()
+                self._refresh_known_devices(current_devices_list)
                 current_system_uids = {dev.full_system_uid for dev in current_devices_list}
 
                 new_system_uids = current_system_uids - self.previous_system_uids

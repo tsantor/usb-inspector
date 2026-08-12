@@ -44,6 +44,17 @@ async def main():
 asyncio.run(main())
 ```
 
+## Device identity
+
+USB Inspector uses a device's vendor/product IDs and USB serial number as its
+preferred identity. When a backend cannot read a serial number temporarily, it
+uses the USB bus and port path to retain the identity already associated with
+that physical connection. USB addresses are not treated as stable because they
+can change when a device re-enumerates.
+
+If a device has no readable serial number and is moved to a different USB port,
+it is necessarily reported as a new device.
+
 ## Issues
 
 If you experience any issues, please create an [issue](https://bitbucket.org/xstudios/usb-inspector/issues) on Bitbucket.
