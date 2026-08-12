@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.1.0 (2026-08-11)
+
+- FIXED transient USB serial-number read failures no longer create duplicate device records or spurious disconnect/connect events.
+- CHANGED device monitoring now reads each serial number once per snapshot and uses the USB bus/port path to preserve an established device identity when the serial is temporarily unavailable.
+- ADDED detection of a different serial number at the same USB port as a device replacement.
+
 ## 1.0.0 (2026-05-22)
 
 **Breaking changes**
