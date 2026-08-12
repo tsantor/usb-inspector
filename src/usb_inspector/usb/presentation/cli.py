@@ -73,7 +73,7 @@ def monitor(services):
 
     def stop_monitor():
         click.secho("\nStopping USB device monitor...", fg="red")
-        loop.create_task(service.stop())
+        loop.create_task(service.stop())  # noqa: RUF006
 
     def _register_signal_handlers():
         # Windows does not expose SIGQUIT and some event loops do not support
