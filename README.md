@@ -55,6 +55,26 @@ can change when a device re-enumerates.
 If a device has no readable serial number and is moved to a different USB port,
 it is necessarily reported as a new device.
 
+Each scan returns one snapshot per `full_system_uid`, even if enumeration
+returns the same device multiple times. A camera with a readable serial keeps
+the same identity when its bus, address, or port changes.
+
+When displaying monitored devices, update rows by `full_system_uid` rather than
+appending a row for every connection event. A reconnect produces another
+`connected` event for the same camera. The registry retains disconnected devices,
+so count currently plugged-in cameras using `get_connected_devices_by_type`,
+not the number of connection events or all devices ever seen:
+
+```python
+cameras = service.get_connected_devices_by_type("2bc5_066b")
+connected_count = len(cameras)
+```
+
+The type key uses an underscore; each camera's `full_system_uid` uses colons,
+for example `2bc5:066b:CL8E36300FC`. If only four specific cameras should be
+included, filter `cameras` against their expected serial numbers. Vendor/product
+IDs alone select every camera of that model.
+
 ## Issues
 
 If you experience any issues, please create an [issue](https://bitbucket.org/xstudios/usb-inspector/issues) on Bitbucket.

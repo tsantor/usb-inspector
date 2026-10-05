@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.1.1 (2026-10-05)
+
+- FIXED repeated USB enumeration results no longer produce duplicate device snapshots or connection callbacks for the same full system UID.
+- ADDED regression coverage for four cameras with unique serials, repeated enumeration, USB location changes, and reconnects.
+- ADDED guidance for updating monitor rows by full system UID and counting currently connected cameras by device type.
+
 ## 1.1.0 (2026-08-11)
 
 - FIXED transient USB serial-number read failures no longer create duplicate device records or spurious disconnect/connect events.

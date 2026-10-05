@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -91,6 +92,67 @@ def test_service_reads_serial_once_per_snapshot():
 
 
 @pytest.mark.asyncio
+async def test_current_devices_deduplicates_repeated_serial_identities():
+    serials = ["CL8E36300FC", "CL8M84100E2", "CL8H363004A", "CL8H3630080"]
+    devices = [
+        FakeUSBDevice(serial, port_numbers=(index,), address=index)
+        for index, serial in enumerate(serials, start=1)
+    ]
+    service = make_service(devices * 3)
+
+    current_devices = await service.get_current_devices()
+
+    assert len(current_devices) == len(serials)
+    assert {device.serial for device in current_devices} == set(serials)
+
+
+@pytest.mark.asyncio
+async def test_four_cameras_emit_one_event_each_and_reuse_rows_after_port_changes():
+    serials = ["CL8E36300FC", "CL8M84100E2", "CL8H363004A", "CL8H3630080"]
+    moved_bus = 2
+    devices = [
+        FakeUSBDevice(serial, port_numbers=(index,), address=index)
+        for index, serial in enumerate(serials, start=1)
+    ]
+    moved_devices = [
+        FakeUSBDevice(
+            serial, port_numbers=(index + 10,), address=index + 10, bus=moved_bus
+        )
+        for index, serial in enumerate(serials, start=1)
+    ]
+    enumerator = MagicMock()
+    enumerator.iter_devices.side_effect = [
+        [],  # Initial scan before the cameras connect.
+        devices * 3,
+        moved_devices * 3,
+        moved_devices[1:] * 3,
+        moved_devices * 3,
+    ]
+    service = USBMonitoringService(enumerator, FakeLookup())
+    events = []
+
+    async def callback(event, device):
+        events.append((event, device.full_system_uid))
+
+    with patch.object(
+        service, "wait_or_timeout", side_effect=[False, False, False, True]
+    ):
+        await service.run(callback)
+
+    uids = [f"1234:5678:{serial}" for serial in serials]
+    assert events == [("connected", uid) for uid in uids] + [
+        ("disconnected", uids[0]),
+        ("connected", uids[0]),
+    ]
+    assert set(service.get_all_devices()) == set(uids)
+    assert len(service.get_connected_devices_by_type("1234_5678")) == len(serials)
+    assert service.get_device_type_summary()["1234_5678"]["total_seen_count"] == len(
+        serials
+    )
+    assert all(device.bus == moved_bus for device in service.get_connected_devices())
+
+
+@pytest.mark.asyncio
 async def test_serial_read_failure_reuses_identity_from_usb_topology():
     enumerator = FakeEnumerator([FakeUSBDevice("SERIAL")])
     service = make_service([])
@@ -105,7 +167,9 @@ async def test_serial_read_failure_reuses_identity_from_usb_topology():
     current_devices = await service.get_current_devices()
 
     assert [device.full_system_uid for device in current_devices] == [canonical_uid]
-    assert {device.full_system_uid for device in current_devices} == service.previous_system_uids
+    assert {
+        device.full_system_uid for device in current_devices
+    } == service.previous_system_uids
     assert len(service.device_registry) == 1
 
 
@@ -180,7 +244,12 @@ async def test_known_serial_reconnect_at_same_port_refreshes_details_and_reuses_
 
     assert set(service.device_registry) == {uid}
     device = service.device_registry[uid]
-    assert (device.bus, device.address, device.port, device.is_connected) == (1, 99, "1", True)
+    assert (device.bus, device.address, device.port, device.is_connected) == (
+        1,
+        99,
+        "1",
+        True,
+    )
     assert events == [("disconnected", uid), ("connected", uid)]
 
 
@@ -235,7 +304,9 @@ async def test_missing_serial_at_a_different_port_uses_a_new_fallback_identity()
     uid = "1234:5678:SERIAL"
     await service._handle_removed_devices({uid})  # noqa: SLF001
     service.previous_system_uids = set()
-    enumerator.devices = [FakeUSBDevice(RuntimeError("serial unavailable"), port_numbers=(2,))]
+    enumerator.devices = [
+        FakeUSBDevice(RuntimeError("serial unavailable"), port_numbers=(2,))
+    ]
 
     current_devices = await service.get_current_devices()
 
@@ -254,7 +325,9 @@ async def test_serial_recovery_merges_different_port_fallback_into_known_device(
     await service._handle_removed_devices({serial_uid})  # noqa: SLF001
     service.previous_system_uids = set()
 
-    enumerator.devices = [FakeUSBDevice(RuntimeError("serial unavailable"), port_numbers=(2,))]
+    enumerator.devices = [
+        FakeUSBDevice(RuntimeError("serial unavailable"), port_numbers=(2,))
+    ]
     fallback_devices = await service.get_current_devices()
     await service._handle_new_devices(fallback_devices)  # noqa: SLF001
     service.previous_system_uids = {fallback_uid}

@@ -147,7 +147,13 @@ class USBMonitoringService:
         devices = [
             self.get_device_info(device) for device in self._enumerator.iter_devices()
         ]
-        return [self._reconcile_identity(device) for device in devices]
+        devices_by_uid: dict[str, USBDeviceSnapshot] = {}
+        for device in devices:
+            device = self._reconcile_identity(device)  # noqa: PLW2901
+            existing = devices_by_uid.get(device.full_system_uid)
+            if existing is None or (not existing.serial and device.serial):
+                devices_by_uid[device.full_system_uid] = device
+        return list(devices_by_uid.values())
 
     def _reconcile_identity(self, device: USBDeviceSnapshot) -> USBDeviceSnapshot:
         """Resolve an observed device to its established canonical identity.
@@ -218,8 +224,13 @@ class USBMonitoringService:
     def _remember_identity(self, device: USBDeviceSnapshot) -> None:
         if device.topology_key:
             if device.serial:
-                for topology_key, mapped_uid in list(self.topology_to_system_uid.items()):
-                    if mapped_uid == device.full_system_uid and topology_key != device.topology_key:
+                for topology_key, mapped_uid in list(
+                    self.topology_to_system_uid.items()
+                ):
+                    if (
+                        mapped_uid == device.full_system_uid
+                        and topology_key != device.topology_key
+                    ):
                         del self.topology_to_system_uid[topology_key]
             self.topology_to_system_uid[device.topology_key] = device.full_system_uid
 
@@ -347,7 +358,10 @@ class USBMonitoringService:
                 dev.full_system_uid,
             )
 
-    async def run(self, callback: Callable[[str, USBDeviceSnapshot], Awaitable[None]] | None = None):
+    async def run(
+        self,
+        callback: Callable[[str, USBDeviceSnapshot], Awaitable[None]] | None = None,
+    ):
         self._callback = callback
         await self.init_tracking()
 
@@ -355,7 +369,9 @@ class USBMonitoringService:
             while not self._shutdown_event.is_set():
                 current_devices_list = await self.get_current_devices()
                 self._refresh_known_devices(current_devices_list)
-                current_system_uids = {dev.full_system_uid for dev in current_devices_list}
+                current_system_uids = {
+                    dev.full_system_uid for dev in current_devices_list
+                }
 
                 new_system_uids = current_system_uids - self.previous_system_uids
                 if new_system_uids:
@@ -383,7 +399,8 @@ class USBMonitoringService:
             logger.info("Monitoring stopped")
 
     async def start(
-        self, callback: Callable[[str, USBDeviceSnapshot], Awaitable[None]] | None = None
+        self,
+        callback: Callable[[str, USBDeviceSnapshot], Awaitable[None]] | None = None,
     ):
         await self.run(callback)
 
