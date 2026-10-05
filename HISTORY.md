@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file. This projec
 
 ## 1.1.1 (2026-10-05)
 
+- FIXED package validation now requires Twine 7.0.0 or newer to support metadata version 2.5.
 - FIXED repeated USB enumeration results no longer produce duplicate device snapshots or connection callbacks for the same full system UID.
 - ADDED regression coverage for four cameras with unique serials, repeated enumeration, USB location changes, and reconnects.
 - ADDED guidance for updating monitor rows by full system UID and counting currently connected cameras by device type.
