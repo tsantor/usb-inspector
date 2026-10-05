@@ -257,7 +257,7 @@ tree-root:
 # Build source and wheel package
 [group('deploy')]
 dist: clean
-    uv run hatch build
+    uv build
 
 # Show package metadata
 [group('deploy')]
@@ -315,4 +315,3 @@ rsync-to-pi:
       --exclude='.pytest_cache' --exclude='.ruff_cache' --exclude='.tox' \
       --exclude='.vscode' --exclude='node_modules' --exclude='dist' \
       --exclude='*.egg-info' --exclude=".tmp"
-

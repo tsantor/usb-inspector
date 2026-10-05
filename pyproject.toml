@@ -30,7 +30,7 @@ dependencies = [
 
 [dependency-groups]
 dev=[
-  "hatch>=1.16.5",
+  
   "pre-commit>=4.4.0",
   "ruff>=0.14.4",
   "twine>=6.2.0",
